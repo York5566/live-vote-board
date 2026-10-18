@@ -1,0 +1,31 @@
+{
+  "name": "live-vote-board",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "test:release": "node tests/release.mjs",
+    "db:local": "wrangler d1 migrations apply vote-board --local",
+    "worker:dev": "wrangler dev --local --port 8787",
+    "worker:deploy": "node scripts/preflight.mjs && wrangler deploy",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "miniflare": "5.20261006.1-alpha",
+    "playwright": "1.62.1",
+    "wrangler": "4.149.0"
+  },
+  "allowScripts": {
+    "workerd@1.20261006.1": true,
+    "esbuild@0.28.2": true
+  }
+}

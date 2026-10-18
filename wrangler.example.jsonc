@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "live-vote-api",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://YOUR-NAME.github.io",
+    "TURNSTILE_HOSTNAMES": "YOUR-NAME.github.io",
+    "DAILY_READ_BUDGET": "1000000",
+    "DAILY_WRITE_BUDGET": "40000",
+    "STORAGE_BUDGET_BYTES": "188743680",
+    "SNAPSHOT_DAYS": "180",
+    "MIN_REFRESH_SECONDS": "15"
+  },
+  "d1_databases": [{ "binding": "DB", "database_name": "vote-board", "database_id": "REPLACE-WITH-D1-ID", "migrations_dir": "migrations" }],
+  "ratelimits": [
+    { "name": "IP_LIMITER", "namespace_id": "58101", "simple": { "limit": 180, "period": 60 } },
+    { "name": "ACTION_LIMITER", "namespace_id": "58102", "simple": { "limit": 8, "period": 60 } },
+    { "name": "SESSION_LIMITER", "namespace_id": "58103", "simple": { "limit": 12, "period": 60 } }
+  ],
+  "triggers": { "crons": ["17 19 * * *"] }
+}

@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {defaults,normalizeConfig,rankCandidates,mergeCandidates,candidate,snapshotSize,cleanImage} from '../shared/model.mjs';
+import {pollDelay} from '../public/assets/polling.mjs';
+test('all editable defaults round-trip, independent A/B state',()=>{const config=defaults();assert.deepEqual(normalizeConfig(config),config);config.groups[0].card.color='#abcdef';assert.notEqual(config.groups[1].card.color,'#abcdef');});
+test('decimals survive normalization and single mode retains second group',()=>{const c=defaults();c.mode='single';c.groups[0].card.texts.number.x=8.75;c.appearance.logo.rotation=14.2;const n=normalizeConfig(c);assert.equal(n.groups[0].card.texts.number.x,8.75);assert.equal(n.appearance.logo.rotation,14.2);assert.equal(n.groups.length,2);});
+test('legacy horizontal and final-results fields are not carried into web settings',()=>{const c=normalizeConfig({...defaults(),layout:'horizontal',final_layout:'horizontal',finalize:true});assert.equal(c.layout,undefined);assert.equal(c.finalize,undefined);});
+test('malformed version and invalid candidates cannot overwrite valid data',()=>{assert.throws(()=>normalizeConfig({version:2}));const c=defaults();c.groups[0].candidates[0].answer='';assert.throws(()=>normalizeConfig(c),/空白/);});
+test('duplicate candidates are rejected within a group, shared answers across groups allowed',()=>{const c=defaults();c.groups[0].candidates[1].answer=c.groups[0].candidates[0].answer;assert.throws(()=>normalizeConfig(c),/重複/);c.groups[0].candidates.pop();c.groups[0].candidates.shift();assert.doesNotThrow(()=>normalizeConfig(c));});
+test('20 candidate cap is enforced',()=>{const c=defaults();c.groups[1].candidates=Array.from({length:21},(_,i)=>candidate('作品'+i));assert.throws(()=>normalizeConfig(c),/20/);});
+test('unsafe image types, remote image URLs and oversized images rejected',()=>{for(const v of ['javascript:alert(1)','https://example.com/a.jpg','data:image/svg+xml;base64,PHN2Zz4='])assert.throws(()=>cleanImage(v));assert.throws(()=>cleanImage('data:image/png;base64,'+'A'.repeat(210000)));});
+test('ranking respects competition ties and zero values',()=>{const c=['a','b','c','d'].map(x=>candidate(x));const r=rankCandidates(c,{a:10,b:5,c:5,d:0});assert.deepEqual(r.map(x=>x.rank),[1,2,2,4]);assert.deepEqual(rankCandidates(c,{b:20},false).map(x=>x.answer),['a','b','c','d']);});
+test('discovery preserves custom image, label and order',()=>{const c=candidate('a');c.label='訂製';c.image='data:image/png;base64,AAAA';const merged=mergeCandidates([c],{a:10,b:0});assert.equal(merged[0].image,c.image);assert.equal(merged[0].label,'訂製');assert.equal(merged[1].answer,'b');});
+test('backoff never retries faster than server Retry-After',()=>{assert.equal(pollDelay(30,1),60);assert.equal(pollDelay(30,6),300);assert.equal(pollDelay(30,2,3600),3600);assert.equal(pollDelay(1,0),15);});
+test('no original user Sheet URL or personal assets in defaults',()=>{const c=defaults();assert.ok(c.groups.every(g=>g.source.url===''));assert.ok(snapshotSize(c)<16000);});

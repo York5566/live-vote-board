@@ -1,0 +1,51 @@
+# 測試與交付記錄
+
+版本：1.0.0。驗證日期：2026-10-13。
+
+範圍：本次新增的網頁版，包含單組與雙組上下排列；原有 Windows 單組與雙組版本未修改。沒有左右排列或結算投票功能。
+
+## 已通過
+
+| 層級 | 結果與證據 |
+|---|---|
+| Node + Miniflare / D1 | 44 個測試通過，涵蓋資料模型、CSV、來源限制、快照分塊、保存與刪除、簽章憑證、Turnstile 契約、流量限制、容量和每日保護上限。 |
+| 實際瀏覽器 | Microsoft Edge 無頭模式，14 個流程通過，無未捕捉的 JavaScript 例外。使用隔離瀏覽器資料，不讀取使用者目前的設定。 |
+| 數字滾輪 | 109 個可見數值欄位以事件檢查數字區與邊框；另用實際滑鼠滾輪驗證小數調整及空白區不改值。 |
+| 圖片與跨電腦流程 | 實際上傳 PNG 並壓縮成 WebP，使用本機 Worker / D1 儲存代碼，再由完全獨立的瀏覽器 context 載入，確認圖片和設定一致。 |
+| 投影 | 編輯器設定同步、操作頁隱藏時投影發出更新請求、同瀏覽器共享鎖只執行一次同時更新。另確認非 16:9 螢幕的留白為深色。 |
+| 手機 | 390 × 844 的首頁和編輯器無橫向溢位，已保存截圖。 |
+| Pages 與 SEO | 6 個發佈檢查通過：儲存庫子路徑、實際瀏覽器載入、投影底色、巢狀 404、自訂網域、URL 格式防護。正式配置會產生 canonical / sitemap / OG；編輯器與投影 noindex。 |
+| 靜態完整性 | 7 個 HTML 頁面、33 個靜態檔案、89 個本地連結及模組匯入通過。交付 dist 的 localDevelopment 為 false；網址未決定前預設不索引。 |
+| Worker 打包 | Wrangler deploy --dry-run 通過，辨識 D1、三個原生 rate-limit binding 與清理排程；沒有執行線上部署。 |
+| 依賴 | npm audit 檢查未發現漏洞。 |
+| ZIP 驗收 | 全新目錄解壓 95 個檔案，其中 94 個內容檔逐一比對 manifest 的 SHA-256，ZIP 本身雜湊也一致。解壓版不依賴 node_modules 即可重建 7 頁靜態網站並通過全部本地連結檢查。 |
+
+## 證據檔案
+
+原始工作目錄的 artifacts/ 內：
+
+- browser-report.json：瀏覽器完整流程結果。
+- release-report.json：GitHub 子路徑與發佈檢查。
+- home-desktop.png、home-mobile.png：首頁。
+- studio-customized.png、studio-mobile.png：編輯器。
+- projection-release.png：修正底色後的投影示範。
+- archive-report.json：壓縮檔雜湊、逐檔核對與解壓重建記錄（位於原始交付資料夾，避免將壓縮檔自己的雜湊包回壓縮檔）。
+
+交付 ZIP 內的 verification/ 收錄上述報告與截圖。manifest.json 列出每個交付檔案的 SHA-256；ZIP 本身另附 .sha256 檔。
+
+Windows 可執行 scripts/verify-archive.ps1 重做解壓驗收。每次建立新的暫存資料夾，不覆寫已有檔案。解壓驗收確認的是原始碼與靜態輸出的完整性，沒有把瀏覽器或正式雲端測試算作重做通過。
+
+## 測試資料與未驗證範圍
+
+瀏覽器使用固定 CSV 經過真實本機 Worker / D1，A 組彙總 18 票，B 組回應欄位 3 票。首頁與獨立投影示範是虛構作品和示範票數，均有標示。這些不是使用者的實際 Google 表單資料。
+
+投影接手檢查使用瀏覽器中的 visibility 狀態切換，並確認實際 API 請求；未在外接投影機上實測。
+
+目前沒有正式 GitHub 儲存庫、Cloudflare 帳號或網域，以下必須上線時驗證：
+
+1. 實際 Google 表單送票到公開票數工作表的完整流程及發布延遲。
+2. Turnstile 真實挑戰、正式網域及防護規則。
+3. Cloudflare Free 實際 CPU、資料列讀寫和大量同時使用情境。本機通過不代表所有 4 MB 圖片快照都必定符合 Free 的 CPU 限制。
+4. GitHub Pages 正式部署、DNS、HTTPS、Search Console 收錄。
+
+免費額度防護能減少濫用；在應用層拒絕的請求仍可能計入 Workers requests，不能保證分散式攻擊永遠不耗盡免費額度。詳細邊界見 ARCHITECTURE.md。

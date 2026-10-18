@@ -1,0 +1,18 @@
+<header class="studio-top"><a class="brand" href="../"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>{{NAME}}</a><div class="actions"><button id="load-code">載入代碼</button><button id="save-code">儲存代碼</button><button id="open-display" class="primary">開啟投影 ↗</button></div></header>
+<main id="main" class="studio-layout">
+  <aside class="settings" aria-label="看板設定">
+    <div class="settings-heading"><h1>打造你的投票現場</h1><span class="status-chip">免費使用</span></div>
+    <div class="segmented" aria-label="看板組數"><button id="mode-single" aria-pressed="false">單組看板</button><button id="mode-dual" aria-pressed="true">雙組・上下排列</button></div>
+    <div class="tabs" id="settings-tabs" role="tablist" aria-label="設定類別"></div>
+    <div class="tab-panel" id="settings-panel" role="tabpanel"></div>
+  </aside>
+  <section class="preview-column" aria-label="即時預覽"><div class="preview-sticky">
+    <div class="preview-heading"><h2>即時預覽 <span id="demo-badge" class="status-chip warn">示範票數</span></h2><small>16:9 投影版面</small></div>
+    <div class="preview-frame"><div id="preview"></div></div>
+    <div class="preview-help"><span>↔ 拖動標題、Logo、組名與總票數調整位置</span><span id="save-state" class="save-state" role="status">準備中…</span></div>
+    <div class="live-strip"><div><p id="connection-status" class="status-text">先設計，再連上你的票源。</p><small id="connection-detail">目前顯示示範資料，讓你放心試做。</small></div><button id="refresh-now" class="small">更新票數 ↻</button></div>
+    <div class="quick-guide"><div class="guide-tile"><strong>一份代碼，帶走整個看板。</strong><p>將圖片與設定一起存到雲端。換電腦輸入代碼，就能接著使用。代碼請私下保存。</p></div><div class="guide-tile"><strong>數值支援小數，調整更細緻。</strong><p>只有滑鼠移到數字上，滾輪才會改變數值。空白處可以安心捲動設定頁。</p></div></div>
+    <div class="preview-help"><a href="../guide/" target="_blank" rel="noopener">串接與使用教學 ↗</a><button id="delete-code" class="small subtle">刪除雲端設定</button></div>
+  </div></section>
+</main>
+<dialog id="cloud-dialog" class="code-dialog" aria-label="雲端設定"></dialog><div id="toast" class="toast" role="status" hidden></div>

@@ -1,0 +1,8 @@
+<main id="main" class="wrap"><article class="article"><span class="section-label">PRIVACY & DATA</span><h1>資料與隱私說明</h1>
+<p>Live Vote Board 用來呈現作品與投票結果。以下說明資料如何儲存，以及你可以如何管理。</p>
+<h2>留在目前瀏覽器的資料</h2><p>編輯中的版面、圖片與個人預設使用 IndexedDB 保存在你的瀏覽器。除非你按下雲端儲存，不會因為調整版面就自動上傳整份設定。使用共用電腦後，請清除此網站的瀏覽資料；無痕模式或瀏覽器清理可能移除本機草稿。</p>
+<h2>使用設定代碼時</h2><p>按「儲存代碼」會將當下的看板設定、票源網址和壓縮圖片傳送至 Cloudflare D1。代碼不是帳號，網站沒有代碼搜尋清單，也不把代碼寫入網址。持有代碼的人可載入或刪除該份設定，請視同私人鑰匙保存。</p><p>預設保存 180 天，儲存完成時會顯示實際到期日。到期後無法再載入，排程會分批清除。你可使用編輯器的「刪除雲端設定」提前移除；平台備份仍可能依 Cloudflare 的備份保留期存在。</p>
+<h2>Google 試算表資料</h2><p>連接票源後，伺服器會讀取你提供的可公開存取工作表，計算選項票數，短暫快取彙總結果。不會儲存完整原始回應，也不會修改 Google 表單或試算表。快取會在排程中清除；斷線時看板可保留最後一次成功結果。</p><p><strong>請只提供不含個資的彙總票數表。</strong>若你公開了原始 Google 試算表，其他人可能直接從 Google 讀取其中資料，不受本網站顯示欄位設定保護。</p>
+<h2>安全驗證與第三方服務</h2><p>網站使用 GitHub Pages 提供靜態頁面，Cloudflare Workers、D1 和 Turnstile 提供資料服務及流量防護。這些平台可能為提供服務及防濫用而處理 IP、瀏覽器與請求資訊。網站本身不加入廣告追蹤或分析 Cookie。</p><p>相關政策：<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer" target="_blank">GitHub 隱私聲明</a>、<a href="https://www.cloudflare.com/privacypolicy/" rel="noopener noreferrer" target="_blank">Cloudflare 隱私政策</a>。</p>
+<h2>內容管理</h2><p>請只上傳你有權使用的作品與圖片。不要上傳個人證件、敏感資料或不適合公開展示的內容。若需撤回某份設定，請在編輯器使用原代碼刪除；其他人已下載的本機副本不會因此自動消失。</p>
+</article></main>
