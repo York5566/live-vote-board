@@ -1,6 +1,6 @@
 # GitHub Pages + Cloudflare Workers / D1 部署
 
-目前交付的是可部署原始碼與靜態網站。**未建立你的 GitHub 儲存庫、未登入 Cloudflare、未上線。** 不需要 OpenAI Sites 帳號或 hosting.json。
+此專案已於 2026-10-18 完成 GitHub Pages 與 Cloudflare 部署，網址與驗證紀錄見 [PRODUCTION.md](PRODUCTION.md)。以下保留從零部署至其他帳號或網域的操作步驟。不需要 OpenAI Sites 帳號或 hosting.json。
 
 ## 1. 本機試用
 

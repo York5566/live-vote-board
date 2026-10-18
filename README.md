@@ -2,6 +2,10 @@
 
 免費 Google 表單即時投票看板的獨立網頁版。前端可部署至 GitHub Pages；後端使用 Cloudflare Workers + D1 Free，無需 R2。現有單組與雙組 Windows 程式未修改。
 
+**線上網站：https://york5566.github.io/live-vote-board/**
+
+已於 2026-10-18 部署至 GitHub Pages，並接上 Cloudflare Workers、D1 與 Turnstile。使用線上版不需要保持本機終端機運行。部署資源、更新方式與驗證範圍見 [正式部署紀錄](docs/PRODUCTION.md)。
+
 ## 功能
 
 - 單組，或雙組上下排列。沒有左右排列與投票結算功能。
@@ -52,5 +56,6 @@ delivery/LiveVoteBoard-1.0.0.zip 包含原始碼、部署範本、可預覽的 d
 - [架構、容量與流量保護](docs/ARCHITECTURE.md)
 - [多語系準備](docs/LOCALIZATION.md)
 - [測試與交付記錄](docs/VALIDATION.md)
+- [正式部署紀錄](docs/PRODUCTION.md)
 
-網站名稱、GitHub 儲存庫與網域尚未決定。交付內容不代表網站已上線，也不代表已完成 Google 搜尋收錄。請依部署指南填入正式 Cloudflare、Turnstile 與 Pages 設定。
+網站暫名 Live Vote Board，現使用 GitHub Pages 網址，尚未綁定自訂網域。正式部署變數已設定；Google 搜尋收錄與實際表單送票流程仍需另外驗證。
