@@ -67,7 +67,9 @@ export function aggregateCSV(csv, source) {
     if(Object.keys(counts).length>100)throw new Error('選項超過 100 個，請確認選到的是投票選項欄。');
     responseRows++;
   }
-  return {counts,total:Object.values(counts).reduce((a,b)=>a+b,0),responseRows,headers};
+  const first=(rows[0]?.[name]||'').trim();
+  const firstRowAnswers=source.mode==='responses'&&source.multiple?[...new Set(first.split(source.separator).map(x=>x.trim()).filter(Boolean))]:first?[first]:[];
+  return {counts,total:Object.values(counts).reduce((a,b)=>a+b,0),responseRows,headers,headerApplied:source.header,firstRowAnswers:firstRowAnswers.map(v=>v.slice(0,120))};
 }
 export async function readLimited(response,maxBytes) {
   if(Number(response.headers.get('content-length'))>maxBytes)throw new Error('資料大小超過限制。');

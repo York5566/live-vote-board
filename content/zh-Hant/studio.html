@@ -2,14 +2,24 @@
 <main id="main" class="studio-layout">
   <aside class="settings" aria-label="看板設定">
     <div class="settings-heading"><h1>打造你的投票現場</h1><span class="status-chip">免費使用</span></div>
-    <div class="segmented" aria-label="看板組數"><button id="mode-single" aria-pressed="false">單組看板</button><button id="mode-dual" aria-pressed="true">雙組・上下排列</button></div>
+    <div class="segmented" aria-label="看板組數"><button id="mode-single" aria-pressed="false">單組看板</button><button id="mode-dual" aria-pressed="true">雙組看板</button></div>
+    <div class="settings-dock"><div class="preset-bar"><button id="save-preset" class="small">儲存為我的預設</button><small>包含所有分類的設定與圖片</small></div>
     <div class="tabs" id="settings-tabs" role="tablist" aria-label="設定類別"></div>
+    </div>
     <div class="tab-panel" id="settings-panel" role="tabpanel"></div>
   </aside>
   <section class="preview-column" aria-label="即時預覽"><div class="preview-sticky">
     <div class="preview-heading"><h2>即時預覽 <span id="demo-badge" class="status-chip warn">示範票數</span></h2><small>16:9 投影版面</small></div>
+    <div class="canvas-toolbar" aria-label="畫布工具">
+      <label class="layer-picker">元素 <select id="canvas-layer"><option value="">選取畫布上的元素…</option></select></label>
+      <label>檢視 <select id="canvas-zoom" aria-label="畫布檢視縮放"><option value="fit">適合畫面</option><option value="1">100%</option><option value="1.5">150%</option></select></label>
+      <button id="canvas-edit-text" class="small" disabled>編輯文字</button>
+      <label id="canvas-color-label" hidden>顏色 <input id="canvas-color" type="color" aria-label="選取元素顏色"></label>
+      <label id="canvas-size-label" hidden>字級 <input id="canvas-size" type="number" min="1" max="120" step="0.1" aria-label="選取元素字級"></label>
+      <div class="history-tools"><button id="undo-edit" class="small" disabled title="復原 Ctrl+Z">↶ 復原</button><button id="redo-edit" class="small" disabled title="重做 Ctrl+Shift+Z">↷ 重做</button></div>
+    </div>
     <div class="preview-frame"><div id="preview"></div></div>
-    <div class="preview-help"><span>↔ 拖動標題、Logo、組名與總票數調整位置</span><span id="save-state" class="save-state" role="status">準備中…</span></div>
+    <div class="preview-help"><span id="canvas-selection-hint">點選移動、拉角點縮放、雙擊改字 · Ctrl+Z 復原</span><span id="save-state" class="save-state" role="status">準備中…</span></div>
     <div class="live-strip"><div><p id="connection-status" class="status-text">先設計，再連上你的票源。</p><small id="connection-detail">目前顯示示範資料，讓你放心試做。</small></div><button id="refresh-now" class="small">更新票數 ↻</button></div>
     <div class="quick-guide"><div class="guide-tile"><strong>一份代碼，帶走整個看板。</strong><p>將圖片與設定一起存到雲端。換電腦輸入代碼，就能接著使用。代碼請私下保存。</p></div><div class="guide-tile"><strong>數值支援小數，調整更細緻。</strong><p>只有滑鼠移到數字上，滾輪才會改變數值。空白處可以安心捲動設定頁。</p></div></div>
     <div class="preview-help"><a href="../guide/" target="_blank" rel="noopener">串接與使用教學 ↗</a><button id="delete-code" class="small subtle">刪除雲端設定</button></div>

@@ -109,3 +109,12 @@ Settings → Secrets and variables → Actions → Variables 新增：
 - [D1 限制](https://developers.cloudflare.com/d1/platform/limits/)
 - [Turnstile 伺服器驗證](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)
 - [Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+
+## 1.1 更新順序與投影螢幕
+
+這版在 shared/model.mjs 增加每張候選卡片的外觀與畫布位置，在 shared/sheets.mjs 增加標題列辨識。先執行 npm run worker:deploy，再推送前端 main，避免舊後端丟棄新設定欄位。不需新增 D1 migration，也不需重建資料庫或更換 secrets。舊代碼仍可載入。
+
+投影選擇使用瀏覽器 Window Management API，需使用者允許。無法列出螢幕時，仍可先拖動投影視窗，再進入目前螢幕全螢幕。
+
+- [Chrome Window Management API](https://developer.chrome.com/docs/capabilities/web-apis/window-management)
+- [MDN requestFullscreen](https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen)

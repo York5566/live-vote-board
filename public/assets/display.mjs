@@ -4,6 +4,7 @@ import {getStored} from './storage.mjs';
 import {CloudClient} from './api.mjs';
 import {Poller} from './polling.mjs';
 import {coordinatedPoll} from './live.mjs';
+import {createScreenPicker} from './screen-picker.mjs';
 const params=new URLSearchParams(location.search),room=params.get('room')||'demo';
 const channel=new BroadcastChannel('live-vote-board-'+room),board=new Board(document.querySelector('#projection')),status=document.querySelector('#display-status'),cloud=new CloudClient();
 let hasState=false,lastSeen=Date.now(),current=null;
@@ -20,7 +21,8 @@ channel.addEventListener('message',e=>{if(e.data?.type==='state')render(e.data);
 channel.postMessage({type:'ready'});
 if(params.get('demo')==='1'){const config=defaults();render({config,states:demoVotes(config),demo:true});}
 else{try{const stored=await getStored('projection-'+room);if(stored&&!hasState)render(stored);}catch{}}
-document.querySelector('#fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{status.textContent='瀏覽器未允許全螢幕，請使用 F11。';}});
+const screenPicker=createScreenPicker({onMessage:message=>{status.textContent=message;document.querySelector('.display-controls').classList.remove('quiet');}});
+document.querySelector('#fullscreen').addEventListener('click',()=>screenPicker.open());
 document.querySelector('#back-studio').addEventListener('click',()=>window.open('../studio/','_blank','noopener'));
 const controls=document.querySelector('.display-controls');let hideTimer;
 function reveal(){controls.classList.remove('quiet');clearTimeout(hideTimer);hideTimer=setTimeout(()=>{if(!controls.contains(document.activeElement))controls.classList.add('quiet');},4000);}

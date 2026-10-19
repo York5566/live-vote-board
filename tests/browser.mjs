@@ -6,18 +6,19 @@ import assert from 'node:assert/strict';
 import {root} from '../scripts/build.mjs';
 const out=join(root,'artifacts'),base='http://127.0.0.1:4183',checks=[],errors=[],api=[];
 await mkdir(out,{recursive:true});
-const server=spawn(process.execPath,['scripts/dev.mjs','--fixtures'],{cwd:root,env:{...process.env,PORT:'4183',API_PORT:'8788'},windowsHide:true,stdio:['pipe','pipe','pipe']});
+const server=spawn(process.execPath,['scripts/dev.mjs','--fixtures'],{cwd:root,env:{...process.env,PORT:'4183',API_PORT:'8798'},windowsHide:true,stdio:['pipe','pipe','pipe']});
 let logs='',browser,active;
 server.stdout.on('data',b=>logs+=b);server.stderr.on('data',b=>logs+=b);
 const ready=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Preview timeout: '+logs)),25000);server.stdout.on('data',b=>{if(String(b).includes('Local:')){clearTimeout(timer);resolve();}});server.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exited '+code+': '+logs));});});
 async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
-function watch(page){page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes(':8788/'))api.push(r.url());});page.on('dialog',d=>d.accept());}
+function watch(page){page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes(':8798/'))api.push(r.url());});page.on('dialog',d=>d.accept());}
 async function waitText(page,selector,part){await page.waitForFunction(([s,t])=>document.querySelector(s)?.textContent.includes(t),[selector,part]);}
 async function wheelAll(page){
   await page.locator('details').evaluateAll(nodes=>nodes.forEach(n=>n.open=true));
   return page.locator('input[type=number]').evaluateAll(inputs=>{
     let count=0;
     for(const input of inputs){
+      if(!input.checkVisibility())continue;
       const original=Number(input.value),step=Number(input.step)||1,direction=original+step<=Number(input.max)?1:-1,style=getComputedStyle(input),rect=input.getBoundingClientRect();
       const x=rect.left+parseFloat(style.paddingLeft)+parseFloat(style.borderLeftWidth)+2,y=rect.top+rect.height/2;
       const event=new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:x,clientY:y,deltaY:-direction*100});input.dispatchEvent(event);
@@ -41,6 +42,7 @@ try{
   await check('dual defaults, single toggle and restore B configuration',async()=>{assert.equal(await page.locator('.group-region').count(),2);await page.click('#mode-single');assert.equal(await page.locator('.group-region').count(),1);await page.click('#mode-dual');assert.equal(await page.locator('.group-region').count(),2);assert.equal(await page.locator('.vote-card').count(),10);});
   await check('A summary and B raw responses connect independently via real local Worker/D1',async()=>{
     await page.fill('#f-groups-0-source-url','https://docs.google.com/spreadsheets/d/TEST_FIXTURE_SHEET_12345/edit');
+    await page.selectOption('#f-groups-0-source-mode','summary');await page.fill('#f-groups-0-source-nameColumn','A');
     await page.getByRole('button',{name:'B 組',exact:true}).click();
     await page.fill('#f-groups-1-source-url','https://docs.google.com/spreadsheets/d/TEST_RESPONSE_SHEET_12345/edit');
     await page.selectOption('#f-groups-1-source-mode','responses');await page.fill('#f-groups-1-source-nameColumn','B');
@@ -65,14 +67,14 @@ try{
     await page.locator('input[type=file]').setInputFiles(join(root,'public/assets/social.png'));await waitText(page,'#toast','圖片已加入');
     await page.fill('#f-groups-0-candidates-0-zoom','1.2');
     assert.ok((await page.locator('.candidate-image>img').first().getAttribute('src')).startsWith('data:image/webp'));
-    await page.click('#tab-group');await page.getByText('卡片底圖',{exact:true}).click();await page.locator('#f-groups-0-card-color').fill('#243848');await page.locator('#f-groups-0-card-color').dispatchEvent('change');
+    await page.click('#tab-group');await page.getByText('卡片底圖',{exact:true}).evaluate(n=>n.parentElement.open=true);await page.locator('#f-groups-0-card-color').fill('#243848');await page.locator('#f-groups-0-card-color').dispatchEvent('change');
     assert.equal(await page.locator('.vote-card').first().evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(36, 56, 72)');
   });
   await check('drag preview updates number fields and preview stays visible after scrolling',async()=>{
     await page.click('#tab-common');await page.evaluate(()=>scrollTo(0,0));const title=page.locator('.board-title'),box=await title.boundingBox();const before=Number(await page.locator('#f-appearance-title-x').inputValue());
     await page.mouse.move(box.x+15,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+65,box.y+box.height/2+8,{steps:5});await page.mouse.up();
     assert.ok(Number(await page.locator('#f-appearance-title-x').inputValue())>before);
-    await page.evaluate(()=>scrollTo(0,600));const preview=await page.locator('#preview').boundingBox();assert.ok(preview.y>=70&&preview.y<150);
+    await page.evaluate(()=>scrollTo(0,600));const preview=await page.locator('#preview').boundingBox();assert.ok(preview.y>=70&&preview.y<260);
     await page.screenshot({path:join(out,'studio-customized.png'),fullPage:false});
   });
   let code,imageData;

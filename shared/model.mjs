@@ -1,3 +1,4 @@
+import {DEMO_SHEET,extraCardDefaults,normalizeCardExtras,normalizeDesign,candidateLayout} from './design.mjs';
 export const LIMITS = Object.freeze({ candidates: 20, imageBytes: 150 * 1024, snapshotBytes: 4 * 1024 * 1024, sourceBytes: 1024 * 1024, minRefresh: 15, maxRows: 10000 });
 export const TEXT_PARTS = {
   name: ['作品名稱', 24, '#ffffff'], caption: ['目前票數', 11, '#b6cdd4'],
@@ -6,14 +7,14 @@ export const TEXT_PARTS = {
 };
 const text = (size, color, x=0, y=0) => ({ size, color, x, y, opacity:100 });
 export function candidate(answer='新作品', i=0) {
-  return { id:crypto.randomUUID(), answer, label:answer, author:'', image:'', demoImage:i % 5, zoom:1, x:0, y:0, rotation:0, opacity:100, fit:'contain' };
+  return { id:crypto.randomUUID(), answer, label:answer, author:'', image:'', demoImage:i % 5, zoom:1, x:0, y:0, rotation:0, opacity:100, fit:'contain',design:{},layout:candidateLayout(),isSourceHeader:false };
 }
 export function group(name='A 組', i=0) {
   return {
-    name, columns:5, sort:true, source:{ url:'', sheetName:'', mode:'summary', nameColumn:'A', countColumn:'B', header:true, multiple:false, separator:', ' },
-    heading:{...text(25,'#f3fbfa',0,50)}, total:{...text(28,'#ffffff',100,50), captionColor:'#d0e5e7', captionSize:10, background:'#ffffff', backgroundOpacity:9, width:110, height:52},
-    card:{ color:'#193f50', opacity:100, radius:15, imageRatio:16/9, texts:Object.fromEntries(Object.entries(TEXT_PARTS).map(([k,v])=>[k,text(v[1],v[2])])), barStart:i?'#3ab8aa':'#ed6ea4', barEnd:i?'#8ddbc5':'#ffbb83', barTrack:'#ffffff', barTrackOpacity:12, rankColor:'#193f50', rankBg:'#ffffff', firstColor:'#413613', firstBg:'#f9d876', rankSize:11, rankPaddingX:10, rankPaddingY:5 },
-    candidates:['山間日光','微風製造所','日日好物','浮光計畫','慢慢生活'].map((n,j)=>candidate(i?['海岸線','一隅','好時光','青空','小日子'][j]:n,j)),
+    name, columns:5, layout:'auto',sort:true, source:{ url:DEMO_SHEET, sheetName:'', mode:'responses', nameColumn:i?'D':'C', countColumn:'B', header:true, multiple:false, separator:', ' },
+    heading:{...text(25,'#f3fbfa',0,50)}, total:{...text(28,'#ffffff',100,50), caption:'目前總票數',captionX:0,captionY:0,numberX:0,numberY:0,captionColor:'#d0e5e7', captionSize:10, background:'#ffffff', backgroundOpacity:9, width:110, height:52},
+    card:{ ...extraCardDefaults(),color:'#193f50', opacity:100, radius:15, imageRatio:16/9, texts:Object.fromEntries(Object.entries(TEXT_PARTS).map(([k,v])=>[k,text(v[1],v[2])])), barStart:i?'#3ab8aa':'#ed6ea4', barEnd:i?'#8ddbc5':'#ffbb83', barTrack:'#ffffff', barTrackOpacity:12, rankColor:'#193f50', rankBg:'#ffffff', firstColor:'#413613', firstBg:'#f9d876', rankSize:11, rankPaddingX:10, rankPaddingY:5 },
+    candidates:Array.from({length:5},(_,j)=>({...candidate((i?'B':'A')+'組作品'+(j+1),j),label:'作品 '+(j+1)})),
   };
 }
 export function defaults() {
@@ -50,10 +51,10 @@ export function normalizeConfig(raw) {
         const answer=str(v.answer,120).trim();
         if(!answer || seen.has(answer)) throw new Error('同一組的投票選項不可空白或重複。');
         seen.add(answer);
-        return {...candidate(answer,j),id:/^[\w-]{1,64}$/.test(v.id||'')?v.id:crypto.randomUUID(),label:str(v.label,120)||answer,author:str(v.author,100),image:cleanImage(v.image),demoImage:num(v.demoImage,0,4,j%5),zoom:num(v.zoom,.1,5,1),x:num(v.x,-100,100,0),y:num(v.y,-100,100,0),rotation:num(v.rotation,-180,180,0),opacity:num(v.opacity,0,100,100),fit:v.fit==='cover'?'cover':'contain'};
+        return {...candidate(answer,j),design:normalizeDesign(v.design,{...d.card,...normalizeCardExtras(c)}),layout:candidateLayout(v.layout),isSourceHeader:v.isSourceHeader===true,id:/^[\w-]{1,64}$/.test(v.id||'')?v.id:crypto.randomUUID(),label:str(v.label,120)||answer,author:str(v.author,100),image:cleanImage(v.image),demoImage:num(v.demoImage,0,4,j%5),zoom:num(v.zoom,.1,5,1),x:num(v.x,-100,100,0),y:num(v.y,-100,100,0),rotation:num(v.rotation,-180,180,0),opacity:num(v.opacity,0,100,100),fit:v.fit==='cover'?'cover':'contain'};
       });
-      return { name:str(g.name,100),columns:num(g.columns,1,10,5),sort:g.sort!==false, source:{url:str(s.url,1000).trim(),sheetName:str(s.sheetName,100),mode:s.mode==='responses'?'responses':'summary',nameColumn:str(s.nameColumn||'A',3).toUpperCase(),countColumn:str(s.countColumn||'B',3).toUpperCase(),header:s.header!==false,multiple:s.multiple===true,separator:str(s.separator||', ',8)},heading:visual(g.heading,d.heading,8,100,[0,100]),total:{...visual(g.total,d.total,8,100,[0,100]),captionColor:color(g.total?.captionColor,d.total.captionColor),captionSize:num(g.total?.captionSize,6,40,10),background:color(g.total?.background,'#ffffff'),backgroundOpacity:num(g.total?.backgroundOpacity,0,100,9),width:num(g.total?.width,60,400,110),height:num(g.total?.height,30,150,52)},
-        card:{color:color(c.color,d.card.color),opacity:num(c.opacity,0,100,100),radius:num(c.radius,0,40,15),imageRatio:num(c.imageRatio,.5,3,16/9),texts:Object.fromEntries(Object.entries(d.card.texts).map(([k,v])=>[k,visual(c.texts?.[k],v)])),barStart:color(c.barStart,d.card.barStart),barEnd:color(c.barEnd,d.card.barEnd),barTrack:color(c.barTrack,'#ffffff'),barTrackOpacity:num(c.barTrackOpacity,0,100,12),rankColor:color(c.rankColor,d.card.rankColor),rankBg:color(c.rankBg,d.card.rankBg),firstColor:color(c.firstColor,d.card.firstColor),firstBg:color(c.firstBg,d.card.firstBg),rankSize:num(c.rankSize,6,40,11),rankPaddingX:num(c.rankPaddingX,0,30,10),rankPaddingY:num(c.rankPaddingY,0,20,5)},candidates};
+      return { name:str(g.name,100),layout:g.layout==='manual'||(!g.layout&&g.columns!=null&&Number(g.columns)!==5)?'manual':'auto',columns:num(g.columns,1,10,5),sort:g.sort!==false, source:{url:str(s.url,1000).trim(),sheetName:str(s.sheetName,100),mode:s.mode==='summary'?'summary':'responses',nameColumn:str(s.nameColumn||'A',3).toUpperCase(),countColumn:str(s.countColumn||'B',3).toUpperCase(),header:s.header!==false,multiple:s.multiple===true,separator:str(s.separator||', ',8)},heading:visual(g.heading,d.heading,8,100,[0,100]),total:{...visual(g.total,d.total,8,100,[0,100]),caption:typeof g.total?.caption==='string'?g.total.caption.slice(0,100):'目前總票數',captionX:num(g.total?.captionX,-200,200,0),captionY:num(g.total?.captionY,-200,200,0),numberX:num(g.total?.numberX,-200,200,0),numberY:num(g.total?.numberY,-200,200,0),captionColor:color(g.total?.captionColor,d.total.captionColor),captionSize:num(g.total?.captionSize,6,40,10),background:color(g.total?.background,'#ffffff'),backgroundOpacity:num(g.total?.backgroundOpacity,0,100,9),width:num(g.total?.width,60,400,110),height:num(g.total?.height,30,150,52)},
+        card:{...normalizeCardExtras(c),color:color(c.color,d.card.color),opacity:num(c.opacity,0,100,100),radius:num(c.radius,0,40,15),imageRatio:num(c.imageRatio,.5,3,16/9),texts:Object.fromEntries(Object.entries(d.card.texts).map(([k,v])=>[k,visual(c.texts?.[k],v)])),barStart:color(c.barStart,d.card.barStart),barEnd:color(c.barEnd,d.card.barEnd),barTrack:color(c.barTrack,'#ffffff'),barTrackOpacity:num(c.barTrackOpacity,0,100,12),rankColor:color(c.rankColor,d.card.rankColor),rankBg:color(c.rankBg,d.card.rankBg),firstColor:color(c.firstColor,d.card.firstColor),firstBg:color(c.firstBg,d.card.firstBg),rankSize:num(c.rankSize,6,40,11),rankPaddingX:num(c.rankPaddingX,0,30,10),rankPaddingY:num(c.rankPaddingY,0,20,5)},candidates};
     })};
   return result;
 }
@@ -71,5 +72,5 @@ export function mergeCandidates(current, counts) {
   return [...current,...additions.map((name,i)=>candidate(name,i))];
 }
 export function snapshotSize(config) { return new TextEncoder().encode(JSON.stringify(config)).length; }
-export function setPath(obj,path,value) { const keys=path.split('.');const last=keys.pop();let target=obj;for(const k of keys)target=target[k];target[last]=value; }
+export function setPath(obj,path,value) { const keys=path.split('.');const last=keys.pop();let target=obj;for(const k of keys){if(!target[k]||typeof target[k]!=='object')target[k]={};target=target[k];}target[last]=value; }
 export function getPath(obj,path) { return path.split('.').reduce((o,k)=>o?.[k],obj); }
