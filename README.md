@@ -4,7 +4,7 @@
 
 **線上網站：https://york5566.github.io/live-vote-board/**
 
-已於 2026-10-18 部署至 GitHub Pages，並接上 Cloudflare Workers、D1 與 Turnstile。使用線上版不需要保持本機終端機運行。部署資源、更新方式與驗證範圍見 [正式部署紀錄](docs/PRODUCTION.md)。
+已於 2026-10-18 部署至 GitHub Pages，2026-10-19 更新為 1.1.0，並接上 Cloudflare Workers、D1 與 Turnstile。使用線上版不需要保持本機終端機運行。部署資源、更新方式與驗證範圍見 [正式部署紀錄](docs/PRODUCTION.md)。
 
 ## 功能
 

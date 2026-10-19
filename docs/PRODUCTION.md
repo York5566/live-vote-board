@@ -1,5 +1,22 @@
 # 正式部署紀錄
 
+## 1.1.0 已上線（2026-10-19）
+
+前端與 Cloudflare 後端已完成更新，使用原來的網站網址。
+
+- 功能原始碼 commit：159da30e1b0b9cb9ea6b91fc50dc407c2896645f。
+- [GitHub Pages 成功發布流程](https://github.com/York5566/live-vote-board/actions/runs/39191928672)。
+- Worker version：abbe334f-4aa6-47b0-b10d-9637b88eb33b。
+- 保留原 D1、Turnstile、流量保護綁定及 secrets，沒有資料表 migration。先更新 Worker，再發布前端，舊代碼仍可載入。
+
+本次在正式 HTTPS 網站完成 8 項驗證：發布 commit 成功；新版 JavaScript／CSS／共用模組與本機驗收版本一致；正式設定、SEO、教學正確；Worker 健康與 CORS 正常、未簽章請求及無效驗證被拒；編輯器載入新示範票源與單組版面；畫布改字與復原可操作；投影接收設定且全螢幕完全隱藏控制列；沒有瀏覽器執行例外。使用 Microsoft Edge 無頭模式及隔離資料，不讀取使用者目前的草稿。
+
+本機另通過 50 個資料／後端測試、14 個既有瀏覽器流程、15 個新編輯器流程與 6 個發布檢查。指定 Google 試算表已透過本機 Worker 真實讀取，兩組各 30 票；正式站此輪未完成真人 Turnstile 成功挑戰及雲端代碼保存／載入，不能把本機結果當成該項正式環境驗收。實體第二螢幕、Google 表單送票與大量活動負載仍未實測。
+
+證據保存在本機忽略版本控制的 artifacts/production-v1.1-report.json、production-v1.1-editor.png；本機詳細範圍見 [VALIDATION.md](VALIDATION.md)。既有草稿與個人預設會保留原票源，新的示範來源只套用到預設的新看板。
+
+## 1.0.0 首次正式部署（歷史記錄）
+
 部署日期：2026-10-18（台灣時間）。
 
 ## 網址與資源
