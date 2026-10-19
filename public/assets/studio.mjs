@@ -6,24 +6,42 @@ import {Poller} from './polling.mjs';
 import {coordinatedPoll} from './live.mjs';
 import {locale as L} from './locales/zh-Hant.mjs';
 import {DEMO_SHEET,reconcileCandidates,candidateLayout} from '../shared/design.mjs';
+import {normalizeSource} from '../shared/sheets.mjs';
+import {sourceLabel,sourceIssues} from '../shared/source-status.mjs';
 const $=s=>document.querySelector(s),node=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
 let config=defaults(),groupIndex=0,selectedId=config.groups[0].candidates[0]?.id,tab='source',states=[],demo=true,session='',dirty=false,saveTimer,toastTimer,lastManual=0,cleanupChallenge=()=>{},broadcastTimer;
 try{const stored=await getStored('draft')||await getStored('defaults');if(stored)config=normalizeConfig(stored);}catch{}
 selectedId=config.groups[0].candidates[0]?.id;
 const room=sessionStorage.getItem('lvb-room')||crypto.randomUUID();sessionStorage.setItem('lvb-room',room);
-const undoStack=[],redoStack=[],openSections=new Map();let historyKey='',historyTime=0,lastCanvasKey='',loadedSources=[],panelsKey='';
+const undoStack=[],redoStack=[],openSections=new Map(),BAR_COLORS=['barStart','barEnd','barTrack','barTrackOpacity'];let historyKey='',historyTime=0,loadedSources=[],panelsKey='',connectionIssues=[],inspectorFrame=0;
 const cloud=new CloudClient(),channel=new BroadcastChannel('live-vote-board-'+room),board=new Board($('#preview'),{editable:true,onChange:canvasChange,onBegin:()=>recordHistory(),onSelection:canvasSelection,onMessage:notify});
 function recordHistory(key=''){if(key&&key===historyKey&&Date.now()-historyTime<700){historyTime=Date.now();return;}undoStack.push(copy(config));if(undoStack.length>20)undoStack.shift();redoStack.length=0;historyKey=key;historyTime=Date.now();syncHistory();}
 function syncHistory(){$('#undo-edit').disabled=!undoStack.length;$('#redo-edit').disabled=!redoStack.length;}
 function restoreHistory(from,to){if(!from.length)return;const previous=JSON.stringify(activeGroups(config).map(g=>g.source));to.push(copy(config));config=normalizeConfig(from.pop());if(previous!==JSON.stringify(activeGroups(config).map(g=>g.source)))invalidate();historyKey='';changed();renderPanels();syncHistory();}
-function canvasChange(patches,final){for(const [path,value]of Object.entries(patches)){setPath(config,path,value);syncInputs(path);}changed();if(final)renderPanels();}
-function canvasSelection(target,targets){
+function canvasChange(patches,final){for(const [path,value]of Object.entries(patches)){setPath(config,path,value);syncInputs(path);}changed();if(final){renderPanels();revealInspector(board.editor.current(),false);}}
+function targetColors(target){return target?.colors||(target?.colorPath?[{label:'顏色',path:target.colorPath,value:target.color}]:[]);}
+function canvasSelection(target,targets,{intent='render',scroll=false}={}){
   const select=$('#canvas-layer'),selected=target?.key||'';select.replaceChildren(new Option('選取畫布上的元素…',''),...targets.map(t=>new Option(t.label,t.key)));select.value=selected;
-  $('#canvas-edit-text').disabled=!target?.textPath;$('#canvas-color-label').hidden=!target?.colorPath;$('#canvas-size-label').hidden=!target?.sizePath;
-  if(target?.colorPath)$('#canvas-color').value=target.color;
+  $('#canvas-edit-text').disabled=!target?.textPath;$('#canvas-size-label').hidden=!target?.sizePath;
+  const colors=targetColors(target);
+  ['', '-end','-track'].forEach((suffix,i)=>{const color=colors[i],input=$('#canvas-color'+suffix);$('#canvas-color'+suffix+'-label').hidden=!color;if(color){$('#canvas-color'+suffix+'-text').textContent=color.label;input.setAttribute('aria-label','選取元素'+color.label);input.value=color.value;}});
   if(target?.sizePath){const input=$('#canvas-size');if(document.activeElement!==input)input.value=displayNumber(target.size);input.dataset.path=target.sizePath;input.min=target.resize?.x?.min??1;input.max=target.resize?.x?.max??120;}
   $('#canvas-selection-hint').textContent=target?.candidateId?'此作品獨立調整 · 可用「還原此作品的個別調整」恢復':target?'拖動移位 · 拉角點縮放 · 方向鍵微調':'點選元素，或從元素清單選取背景、卡片等較難點到的項目。';
-  if(selected&&selected!==lastCanvasKey){lastCanvasKey=selected;if(target.group!==undefined)groupIndex=target.group;if(target.candidateId)selectedId=target.candidateId;if(target.section){tab=target.section;renderPanels();}}
+  if(intent==='select'&&target){if(target.group!==undefined)groupIndex=target.group;if(target.candidateId)selectedId=target.candidateId;tab=target.section;renderPanels();}
+  if(intent!=='render'||target?.section===tab)revealInspector(target,scroll);
+}
+function revealInspector(target,scroll=false){
+  document.querySelectorAll('.inspector-active').forEach(n=>n.classList.remove('inspector-active'));
+  if(!target||target.section!==tab||target.group!==undefined&&target.group!==groupIndex||target.candidateId&&target.candidateId!==selectedId)return;
+  const section=[...$('#settings-panel').querySelectorAll('[data-inspector]')].find(n=>n.dataset.inspector===target.settingsKey);if(!section)return;
+  section.classList.add('inspector-active');if(scroll||!board.editor.gesture)section.open=true;
+  if(!scroll)return;cancelAnimationFrame(inspectorFrame);inspectorFrame=requestAnimationFrame(()=>{
+    if(!section.isConnected)return;
+    const sidebar=$('.settings'),r=section.getBoundingClientRect(),dock=$('.settings-dock').getBoundingClientRect(),top=$('.studio-top').getBoundingClientRect().bottom+dock.height+12;
+    if(r.top>=top&&r.top<innerHeight-90)return;
+    if(getComputedStyle(sidebar).overflowY==='auto')sidebar.scrollTop+=r.top-top;
+    else window.scrollBy(0,r.top-top);
+  });
 }
 function notify(message,error=false){const target=$('#toast');clearTimeout(toastTimer);target.textContent=message;target.classList.toggle('error',error);target.hidden=false;toastTimer=setTimeout(()=>target.hidden=true,6000);}
 function shownStates(){return demo?demoVotes(config):states;}
@@ -33,7 +51,7 @@ async function persist(){
   try{const normalized=normalizeConfig(config);await setStored('draft',normalized);dirty=false;$('#save-state').textContent=L.messages.localSaved;}catch(e){$('#save-state').textContent=e.name==='QuotaExceededError'?L.messages.localFailure:'請完成目前設定：'+e.message;}
 }
 function changed(render=true){dirty=true;$('#save-state').textContent='儲存中…';clearTimeout(saveTimer);saveTimer=setTimeout(persist,450);if(render)renderBoard();else scheduleBroadcast();}
-function invalidate(){session='';poller.stop();$('#connection-detail').textContent='票源設定已改變，請按「連接並讀取」重新連線。';$('#connection-status').textContent='等待重新連接';}
+function invalidate(){session='';poller.stop();connectionIssues=[];renderSourceFeedback();$('#connection-detail').textContent='票源設定已改變，請按「連接並讀取」重新連線。';$('#connection-status').textContent='等待重新連接';}
 function update(path,value,{rebuild=false}={}){
   recordHistory(path);
   const header=path.match(/^groups\.(\d)\.source\.header$/);
@@ -46,30 +64,33 @@ function update(path,value,{rebuild=false}={}){
   }
   setPath(config,path,value);
   const shared=path.match(/^groups\.(\d)\.card\.(.+)$/);
-  if(shared)for(const c of config.groups[Number(shared[1])].candidates){const keys=shared[2].split('.'),last=keys.pop();let o=c.design;for(const k of keys)o=o?.[k];if(o)delete o[last];}
+  if(shared&&!BAR_COLORS.includes(shared[2]))for(const c of config.groups[Number(shared[1])].candidates){const keys=shared[2].split('.'),last=keys.pop();let o=c.design;for(const k of keys)o=o?.[k];if(o)delete o[last];}
   if(path.includes('.source.')||path==='mode')invalidate();
   if(path==='refresh')poller.seconds=Math.max(15,value);
   changed();if(rebuild)renderPanels();
 }
 const displayNumber=value=>Number.isFinite(Number(value))?Number(Number(value).toFixed(4)):value;
-function syncInputs(path){for(const input of document.querySelectorAll('[data-path]'))if(input.dataset.path===path&&document.activeElement!==input){const value=getPath(config,path);if(input.type==='checkbox')input.checked=value;else input.value=input.type==='number'?displayNumber(value):value;}}
-function field(label,path,{type='text',min,max,step=.1,options,hint,help,unit,rebuild=false}={}){
+function fieldValue(path){const own=getPath(config,path);if(own!==undefined)return own;const match=path.match(/^groups\.(\d)\.candidates\.\d+\.design\.(.+)$/);return match?getPath(config.groups[Number(match[1])].card,match[2]):own;}
+function syncInputs(path){for(const input of document.querySelectorAll('[data-path]'))if(input.dataset.path===path&&document.activeElement!==input){const value=fieldValue(path);if(input.type==='checkbox')input.checked=value;else input.value=input.type==='number'?displayNumber(value):value;}}
+function field(label,path,{type='text',min,max,step=.1,options,hint,help,unit,rebuild=false,requiredToken}={}){
   const row=node('div',type==='text'||options?'field':'field-row'),id='f-'+path.replaceAll('.','-'),lab=node('label','',label);lab.htmlFor=id;
   let input;
   if(options){input=node('select');for(const [value,title]of options){const opt=node('option','',title);opt.value=value;input.append(opt);}}
   else {input=node('input');input.type=type;}
   input.id=id;input.dataset.path=path;
   if(type==='number'){input.min=min;input.max=max;input.step=step;input.inputMode='decimal';}
-  if(type==='checkbox')input.checked=!!getPath(config,path);else input.value=type==='number'?displayNumber(getPath(config,path)):getPath(config,path)??'';
+  if(type==='checkbox')input.checked=!!fieldValue(path);else input.value=type==='number'?displayNumber(fieldValue(path)):fieldValue(path)??'';
   input.addEventListener(type==='checkbox'||type==='color'||options?'change':'input',()=>{
     let value=input.value;
     if(type==='checkbox')value=input.checked;
     if(type==='number'){if(value===''||!Number.isFinite(Number(value)))return;value=Math.max(min,Math.min(max,Number(value)));}
+    if(requiredToken){input.setCustomValidity(value.includes(requiredToken)?'':'請保留 '+requiredToken);if(!value.includes(requiredToken))return;}
     update(path,value,{rebuild});
   });
   if(type==='color')input.addEventListener('input',()=>update(path,input.value));
-  if(type==='number')input.addEventListener('blur',()=>{input.value=displayNumber(getPath(config,path));});
-  if(help){const info=button('？',()=>{},'field-help');info.setAttribute('aria-label','說明：'+label);info.title=help;const tip=node('span','field-tooltip',help);tip.id=id+'-help';tip.setAttribute('role','tooltip');info.setAttribute('aria-describedby',tip.id);const wrap=node('span','help-wrap');wrap.append(info,tip);lab.append(wrap);const placeHelp=()=>{tip.style.transform='';const r=tip.getBoundingClientRect();if(r.left<8)tip.style.transform='translateX('+(8-r.left)+'px)';else if(r.right>innerWidth-8)tip.style.transform='translateX('+(innerWidth-8-r.right)+'px)';};wrap.addEventListener('pointerenter',placeHelp);info.addEventListener('focus',placeHelp);}
+  if(type==='number')input.addEventListener('blur',()=>{input.value=displayNumber(fieldValue(path));});
+  if(requiredToken)input.addEventListener('blur',()=>{if(!input.validity.valid){notify('請保留 '+requiredToken+'，已恢復上一份有效文字。',true);input.value=fieldValue(path);input.setCustomValidity('');}});
+  if(help){const info=button('？',()=>{},'field-help');info.setAttribute('aria-label','說明：'+label);const tip=node('span','field-tooltip',help);tip.id=id+'-help';tip.setAttribute('role','tooltip');info.setAttribute('aria-describedby',tip.id);const wrap=node('span','help-wrap');wrap.append(info,tip);lab.append(wrap);const placeHelp=()=>{tip.style.transform='';const r=tip.getBoundingClientRect(),pane=$('.settings').getBoundingClientRect(),left=Math.max(8,pane.left+8),right=Math.min(innerWidth-8,pane.right-14);const dx=r.left<left?left-r.left:r.right>right?right-r.right:0,top=Math.max(8,$('.studio-top').getBoundingClientRect().bottom+8),bottom=Math.min(innerHeight-8,pane.bottom-8);let dy=r.bottom>bottom?-r.height-36:0;if(r.top+dy<top)dy=top-r.top;tip.style.transform='translate('+dx+'px,'+dy+'px)';};wrap.addEventListener('pointerenter',placeHelp);info.addEventListener('focus',placeHelp);}
   row.append(lab);
   if(unit){const box=node('div','input-unit'),suffix=node('span','',unit);box.append(input,suffix);row.append(box);}else row.append(input);
   if(hint)row.append(node('small','hint',hint));
@@ -77,11 +98,12 @@ function field(label,path,{type='text',min,max,step=.1,options,hint,help,unit,re
 }
 function numeric(label,path,min,max,unit='',step=.1){return field(label,path,{type:'number',min,max,unit,step});}
 function button(label,handler,cls=''){const b=node('button',cls,label);b.type='button';b.addEventListener('click',handler);return b;}
-function details(title,children,{open=false}={}){const box=node('details');box.open=open;box.append(node('summary','',title));const content=node('div','detail-content');content.append(...children);box.append(content);return box;}
+function details(title,children,{open=false,key}={}){const box=node('details');box.open=open;if(key)box.dataset.inspector=key;box.append(node('summary','',title));const content=node('div','detail-content');content.append(...children);box.append(content);return box;}
 function textControls(path,{position=true}={}){
   const minSize=path.includes('.texts.')?1:path.includes('subtitle')?6:8,maxSize=path.includes('subtitle')?70:/\.(heading|total)$/.test(path)?100:120;
   const rows=[field(L.controls.color,path+'.color',{type:'color'}),numeric('文字大小',path+'.size',minSize,maxSize,'px'),numeric('不透明度',path+'.opacity',0,100,'%')];
-  if(position)rows.push(numeric('水平位置',path+'.x',path.includes('.texts.')?-200:0,path.includes('.texts.')?200:100,path.includes('.texts.')?'px':'%'),numeric('垂直位置',path+'.y',path.includes('.texts.')?-200:0,path.includes('.texts.')?200:100,path.includes('.texts.')?'px':'%'));
+  const range=path.includes('.design.')?500:200;
+  if(position)rows.push(numeric('水平位置',path+'.x',path.includes('.texts.')?-range:0,path.includes('.texts.')?range:100,path.includes('.texts.')?'px':'%'),numeric('垂直位置',path+'.y',path.includes('.texts.')?-range:0,path.includes('.texts.')?range:100,path.includes('.texts.')?'px':'%'));
   return rows;
 }
 function upload(label,path){
@@ -92,10 +114,11 @@ function upload(label,path){
 }
 function groupChooser(){
   if(config.mode==='single')return document.createDocumentFragment();
-  const chooser=node('div','segmented group-select');for(let i=0;i<(config.mode==='single'?1:2);i++){const b=button(i?'B 組':'A 組',()=>{groupIndex=i;selectedId=config.groups[i].candidates[0]?.id;renderPanels();renderBoard();},i===groupIndex?'active':'');b.setAttribute('aria-pressed',i===groupIndex);chooser.append(b);}return chooser;
+  const chooser=node('div','segmented group-select');for(let i=0;i<(config.mode==='single'?1:2);i++){const b=button(i?'B 組':'A 組',()=>{board.editor.select(null);groupIndex=i;selectedId=config.groups[i].candidates[0]?.id;renderPanels();renderBoard();},i===groupIndex?'active':'');b.setAttribute('aria-pressed',i===groupIndex);chooser.append(b);}return chooser;
 }
 function sourcePanel(panel){
   panel.append(node('p','panel-intro','先到 Google 表單的「回應」分頁，按綠色試算表圖示，建立回應試算表。這裡會讀取工作表並計算票數。'+(config.mode==='dual'?'兩組可使用同一份試算表的不同答案欄。':'')),groupChooser());
+  const feedback=node('div','source-feedback');feedback.setAttribute('role','status');panel.append(feedback);
   const p='groups.'+groupIndex+'.source',g=config.groups[groupIndex];
   panel.append(field('① Google 回應試算表網址',p+'.url',{hint:'貼上 docs.google.com/spreadsheets/ 開頭的網址；不是 forms.gle 填答連結。',help:'在 Google 表單 → 回應 → 綠色試算表圖示開啟試算表，複製瀏覽器網址。必須開放讀取選定的工作表；請勿公開含個資的原始回應。'}),
     field('工作表分頁名稱（選填）',p+'.sheetName',{hint:'指試算表底部的分頁名稱，例如「表單回應 1」。不確定時可先留白。',help:'不是整份檔案的標題。填入後會使用指定分頁；留白使用網址的 gid，網址沒指定 gid 時使用第一張分頁。'}),
@@ -114,11 +137,10 @@ function sourcePanel(panel){
   panel.append(numeric('自動更新間隔','refresh',15,300,'秒',1),node('p','hint','最低 15 秒、預設 30 秒。頁面在背景時暫停更新；Google 發布資料本身可能有延遲。'),button('連接並讀取候選作品',connect,'primary'),button('暫停自動更新',()=>{poller.stop();$('#connection-status').textContent=L.messages.paused;notify('已暫停。按「更新票數」可繼續。');},'subtle small'));
 }
 function commonPanel(panel){
-  panel.append(node('p','panel-intro','標題、Logo 和背景套用整個看板。點選畫布元素可拖動、拉角點縮放；文字可以雙擊編輯。'),
-    field('看板主標題','title'),field('副標題','subtitle'));
-  panel.append(details('標題外觀與位置',textControls('appearance.title'),{open:true}),details('副標外觀與位置',textControls('appearance.subtitle')),
-    details('活動 Logo',[upload('上傳 Logo','appearance.logo.image'),numeric('水平位置','appearance.logo.x',0,100,'%'),numeric('垂直位置','appearance.logo.y',0,100,'%'),numeric('寬度','appearance.logo.width',20,500,'px'),numeric('高度','appearance.logo.height',20,240,'px'),numeric('縮放','appearance.logo.zoom',.1,5,'倍'),numeric('旋轉','appearance.logo.rotation',-180,180,'°'),numeric('不透明度','appearance.logo.opacity',0,100,'%'),numeric('圓角','appearance.logo.roundness',0,100,'px')]),
-    details('背景與遮罩',[field('背景顏色','appearance.background',{type:'color'}),upload('上傳背景圖片','appearance.image'),numeric('背景縮放','appearance.zoom',.1,5,'倍'),numeric('水平位移','appearance.x',-100,100,'%'),numeric('垂直位移','appearance.y',-100,100,'%'),numeric('旋轉','appearance.rotation',-180,180,'°'),numeric('圖片不透明度','appearance.opacity',0,100,'%'),field('遮罩顏色','appearance.maskColor',{type:'color'}),numeric('遮罩不透明度','appearance.maskOpacity',0,100,'%'),node('p','hint','遮罩設為 0% 就會呈現原本圖片的顏色。')]),
+  panel.append(node('p','panel-intro','標題、Logo 和背景套用整個看板。點選畫布會展開對應設定；文字可以雙擊編輯。'));
+  panel.append(details('標題外觀與位置',[field('看板主標題','title'),...textControls('appearance.title')],{open:true,key:'title'}),details('副標外觀與位置',[field('副標題','subtitle'),...textControls('appearance.subtitle')],{key:'subtitle'}),
+    details('活動 Logo',[upload('上傳 Logo','appearance.logo.image'),numeric('水平位置','appearance.logo.x',0,100,'%'),numeric('垂直位置','appearance.logo.y',0,100,'%'),numeric('寬度','appearance.logo.width',20,500,'px'),numeric('高度','appearance.logo.height',20,240,'px'),numeric('縮放','appearance.logo.zoom',.1,5,'倍'),numeric('旋轉','appearance.logo.rotation',-180,180,'°'),numeric('不透明度','appearance.logo.opacity',0,100,'%'),numeric('圓角','appearance.logo.roundness',0,100,'px')],{key:'logo'}),
+    details('背景與遮罩',[field('背景顏色','appearance.background',{type:'color'}),upload('上傳背景圖片','appearance.image'),numeric('背景縮放','appearance.zoom',.1,5,'倍'),numeric('水平位移','appearance.x',-100,100,'%'),numeric('垂直位移','appearance.y',-100,100,'%'),numeric('旋轉','appearance.rotation',-180,180,'°'),numeric('圖片不透明度','appearance.opacity',0,100,'%'),field('遮罩顏色','appearance.maskColor',{type:'color'}),numeric('遮罩不透明度','appearance.maskOpacity',0,100,'%'),node('p','hint','遮罩設為 0% 就會呈現原本圖片的顏色。')],{key:'background'}),
     details('版面與提示音',[numeric('標題區高度','appearance.headerHeight',60,260,'px'),...(config.mode==='dual'?[numeric('上下兩組間距','appearance.gap',4,60,'px')]:[]),field('票數增加時播放提示音','sound',{type:'checkbox'}),node('p','hint','提示音由操作頁播放，避免投影視窗重複發聲。')]));
   panel.append(node('div','info-box','上方「儲存為我的預設」會保存整份設定與圖片到目前瀏覽器。若要換電腦，請另存雲端代碼。'));
 }
@@ -127,25 +149,36 @@ function groupPanel(panel){
   panel.append(field('卡片排列',p+'.layout',{options:[['auto','依候選數量自動安排（建議）'],['manual','自行指定每列張數']],rebuild:true}));
   if(config.groups[groupIndex].layout==='manual')panel.append(numeric('每列卡片數量',p+'.columns',1,10,'張',1));
   panel.append(field('依票數由高到低排序',p+'.sort',{type:'checkbox'}),node('p','hint','整組外觀會套用同組所有作品；在畫布微調只影響選取的作品。'),button('還原卡片自動位置與大小',()=>{recordHistory();config.groups[groupIndex].candidates.forEach(c=>c.layout=candidateLayout());changed();},'small subtle'));
-  if(config.mode==='dual')panel.append(field('組別名稱',p+'.name'),details('組別名稱外觀',textControls(p+'.heading'),{open:true}));
-  panel.append(details('總票數區',[field('說明文字',p+'.total.caption'),...textControls(p+'.total'),field('說明文字顏色',p+'.total.captionColor',{type:'color'}),numeric('說明文字大小',p+'.total.captionSize',6,40,'px'),field('底色',p+'.total.background',{type:'color'}),numeric('底色不透明度',p+'.total.backgroundOpacity',0,100,'%'),numeric('區塊寬度',p+'.total.width',60,400,'px'),numeric('區塊高度',p+'.total.height',30,150,'px')]),
+  if(config.mode==='dual')panel.append(details('組別名稱外觀',[field('組別名稱',p+'.name'),...textControls(p+'.heading')],{open:true,key:'heading'}));
+  panel.append(details('總票數區',[field('說明文字',p+'.total.caption'),...textControls(p+'.total'),field('說明文字顏色',p+'.total.captionColor',{type:'color'}),numeric('說明文字大小',p+'.total.captionSize',6,40,'px'),numeric('說明文字水平位移',p+'.total.captionX',-200,200,'px'),numeric('說明文字垂直位移',p+'.total.captionY',-200,200,'px'),numeric('數字水平位移',p+'.total.numberX',-200,200,'px'),numeric('數字垂直位移',p+'.total.numberY',-200,200,'px'),field('底色',p+'.total.background',{type:'color'}),numeric('底色不透明度',p+'.total.backgroundOpacity',0,100,'%'),numeric('區塊寬度',p+'.total.width',60,400,'px'),numeric('區塊高度',p+'.total.height',30,150,'px')],{key:'total'}),
     details('卡片底圖',[field('卡片底色',p+'.card.color',{type:'color'}),numeric('底色不透明度',p+'.card.opacity',0,100,'%'),numeric('圓角大小',p+'.card.radius',0,40,'px'),numeric('候選圖片寬高比',p+'.card.imageRatio',.5,3,'比值'),node('p','hint','16:9 的比值是 1.78。投影版面會依卡片數量自動縮放，建議圖片至少 1280 × 720。')]));
   for(const [part,label]of Object.entries(L.textParts))panel.append(details(label+'外觀',textControls(p+'.card.texts.'+part)));
-  panel.append(details('票數長條',[field('長條起始顏色',p+'.card.barStart',{type:'color'}),field('長條結束顏色',p+'.card.barEnd',{type:'color'}),field('長條底色',p+'.card.barTrack',{type:'color'}),numeric('長條底色不透明度',p+'.card.barTrackOpacity',0,100,'%')]),
+  panel.append(details('票數長條（整組預設）',[node('p','hint','以下配色供尚未個別調整的作品使用。已自訂的作品會保留自己的顏色；要全部統一，請按下方套用按鈕。'),...barColorControls(p+'.card'),button('將整組長條配色套用到所有作品',()=>{recordHistory();for(const c of config.groups[groupIndex].candidates)for(const key of BAR_COLORS)delete c.design[key];changed();notify('同組所有作品已套用整組長條配色；可按復原還原。');},'small subtle')]),
     details('第幾名標籤',[field('一般名次文字',p+'.card.rankColor',{type:'color'}),field('一般名次底色',p+'.card.rankBg',{type:'color'}),field('第一名文字',p+'.card.firstColor',{type:'color'}),field('第一名底色',p+'.card.firstBg',{type:'color'}),numeric('名次文字大小',p+'.card.rankSize',6,40,'px'),numeric('標籤左右留白',p+'.card.rankPaddingX',0,30,'px'),numeric('標籤上下留白',p+'.card.rankPaddingY',0,20,'px')]));
   if(config.mode==='dual')panel.append(button('複製這組的外觀到'+(groupIndex?' A':' B')+' 組',()=>{recordHistory();const other=1-groupIndex,g=config.groups[groupIndex];for(const key of ['heading','total','card','columns','layout','sort'])config.groups[other][key]=copy(g[key]);config.groups[other].candidates.forEach(c=>c.design={});changed();notify('外觀已套用，票源、作品和圖片各自保留。');},'small'));
 }
+function barColorControls(path){return [field('起始色',path+'.barStart',{type:'color'}),field('結束色',path+'.barEnd',{type:'color'}),field('底軌色',path+'.barTrack',{type:'color'}),numeric('底軌不透明度',path+'.barTrackOpacity',0,100,'%'),node('p','hint','起始色與結束色相同即為單色長條。底軌是尚未填滿的背景；太淡時可提高底軌不透明度。')];}
 function candidatesPanel(panel){
   panel.append(groupChooser(),node('p','panel-intro','「投票選項」必須與試算表一致；「顯示名稱」可自由修改。點選右側卡片也能快速編輯。'));
   const g=config.groups[groupIndex],list=node('div','candidate-list');
   if(!g.candidates.some(c=>c.id===selectedId))selectedId=g.candidates[0]?.id;
-  g.candidates.forEach((c,i)=>{const b=button('',()=>{selectedId=c.id;renderPanels();renderBoard();},'candidate-item'+(c.id===selectedId?' active':'')),img=node('img');img.src=imageSource(c);img.alt='';b.append(img,node('span','candidate-item-name',c.label),node('small','',String(i+1).padStart(2,'0')));list.append(b);});
+  g.candidates.forEach((c,i)=>{const b=button('',()=>{board.editor.select(null);selectedId=c.id;renderPanels();renderBoard();},'candidate-item'+(c.id===selectedId?' active':'')),img=node('img');img.src=imageSource(c);img.alt='';b.append(img,node('span','candidate-item-name',c.label),node('small','',String(i+1).padStart(2,'0')));list.append(b);});
   panel.append(list,button('＋ 新增候選作品',()=>{if(g.candidates.length>=LIMITS.candidates){notify('每個看板區域最多 20 個作品。',true);return;}recordHistory();let n=g.candidates.length+1;while(g.candidates.some(c=>c.answer==='作品 '+n))n++;const c=candidate('作品 '+n,n);g.candidates.push(c);selectedId=c.id;changed();renderPanels();},'small'));
   const index=g.candidates.findIndex(c=>c.id===selectedId);if(index<0)return;
-  const p='groups.'+groupIndex+'.candidates.'+index,editor=node('div','candidate-editor');
-  editor.append(field('投票選項（與試算表完全一致）',p+'.answer'),field('看板顯示名稱',p+'.label'),field('製作人／作者（選填）',p+'.author'),upload('上傳候選作品圖片',p+'.image'),
+  const c=g.candidates[index],p='groups.'+groupIndex+'.candidates.'+index,dp=p+'.design',editor=node('div','candidate-editor');
+  const section=(key,title,controls,open=false)=>details(title,[node('p','inspector-scope','只調整：'+(config.mode==='dual'?(groupIndex?'B':'A')+' 組 · ':'')+c.label),...controls],{key,open});
+  editor.append(section('name','作品名稱',[field('投票選項（與試算表完全一致）',p+'.answer'),field('看板顯示名稱',p+'.label'),...textControls(dp+'.texts.name')],true),
+    section('author','製作人／作者',[field('製作人／作者（選填）',p+'.author'),field('作者文字顏色',dp+'.credit.color',{type:'color'}),numeric('作者字級',dp+'.credit.size',6,50,'px'),field('作者標籤底色',dp+'.credit.background',{type:'color'}),numeric('作者底色不透明度',dp+'.credit.opacity',0,100,'%'),numeric('作者水平位移',dp+'.credit.x',-500,500,'px'),numeric('作者垂直位移',dp+'.credit.y',-500,500,'px')],true),
+    section('image','作品圖片',[upload('上傳候選作品圖片',p+'.image'),
     field('圖片顯示方式',p+'.fit',{options:[['contain','完整顯示'],['cover','填滿圖片區']] }),
-    numeric('圖片縮放',p+'.zoom',.1,5,'倍'),numeric('水平位移',p+'.x',-100,100,'%'),numeric('垂直位移',p+'.y',-100,100,'%'),numeric('旋轉角度',p+'.rotation',-180,180,'°'),numeric('圖片不透明度',p+'.opacity',0,100,'%'),
+    numeric('圖片縮放',p+'.zoom',.1,5,'倍'),numeric('水平位移',p+'.x',-100,100,'%'),numeric('垂直位移',p+'.y',-100,100,'%'),numeric('旋轉角度',p+'.rotation',-180,180,'°'),numeric('圖片不透明度',p+'.opacity',0,100,'%')],true),
+    section('card','卡片底圖與位置',[field('卡片底色',dp+'.color',{type:'color'}),numeric('底色不透明度',dp+'.opacity',0,100,'%'),numeric('圓角大小',dp+'.radius',0,40,'px'),numeric('候選圖片寬高比',dp+'.imageRatio',.5,3,'比值'),numeric('卡片水平位移',p+'.layout.x',-1600,1600,'px'),numeric('卡片垂直位移',p+'.layout.y',-900,900,'px'),numeric('整張卡片縮放',p+'.layout.scale',.2,3,'倍')]));
+  for(const [part,label]of Object.entries(L.textParts))if(part!=='name'){
+    const controls=part==='number'?[node('p','hint','數字由票源計算，這裡只調整外觀。')]:[field(part==='share'?'百分比文字（保留 {percent}）':part==='unit'?'票數單位':'票數說明文字',dp+'.'+(part==='share'?'shareTemplate':part),{requiredToken:part==='share'?'{percent}':null})];
+    editor.append(section(part,label,[...controls,...textControls(dp+'.texts.'+part)]));
+  }
+  editor.append(section('bar','票數長條',[...barColorControls(dp),numeric('長條水平位移',dp+'.barX',-500,500,'px'),numeric('長條垂直位移',dp+'.barY',-500,500,'px'),numeric('長條寬度',dp+'.barWidth',10,200,'%'),numeric('長條厚度',dp+'.barHeight',1,40,'px'),button('恢復這張作品的整組長條配色',()=>{recordHistory();for(const key of BAR_COLORS)delete c.design[key];changed();renderPanels();revealInspector(board.editor.current(),false);notify('這張作品的長條已恢復整組配色，其他作品保持原設定。');},'small subtle')]),
+    section('rank','第幾名標籤',[field('名次文字（保留 {rank}）',dp+'.rankTemplate',{requiredToken:'{rank}'}),field('一般名次文字顏色',dp+'.rankColor',{type:'color'}),field('一般名次底色',dp+'.rankBg',{type:'color'}),field('第一名文字顏色',dp+'.firstColor',{type:'color'}),field('第一名底色',dp+'.firstBg',{type:'color'}),numeric('名次文字大小',dp+'.rankSize',6,40,'px'),numeric('名次水平位移',dp+'.rankX',-500,500,'px'),numeric('名次垂直位移',dp+'.rankY',-500,500,'px'),numeric('左右留白',dp+'.rankPaddingX',0,30,'px'),numeric('上下留白',dp+'.rankPaddingY',0,20,'px')]),
     button('選取整張卡片（拖動／縮放）',()=>board.editor.select('c-'+g.candidates[index].id+'-card'),'small'),
     button('還原此作品的個別調整',()=>{recordHistory();Object.assign(g.candidates[index],{design:{},layout:candidateLayout(),x:0,y:0,zoom:1,rotation:0});changed();renderPanels();notify('已恢復整組外觀與自動排版，作品圖片和名稱保留。');},'small subtle'),
     button('移除此候選作品',()=>{if(!confirm('移除「'+g.candidates[index].label+'」？票源的原始資料不會被修改。'))return;recordHistory();g.candidates.splice(index,1);selectedId=g.candidates[0]?.id;changed();renderPanels();},'small danger'));
@@ -156,29 +189,31 @@ function renderPanels(){
   const panel=$('#settings-panel');if(panelsKey)openSections.set(panelsKey,[...panel.querySelectorAll('details[open]>summary')].map(n=>n.textContent));
   panelsKey=tab+':'+groupIndex+':'+config.mode;
   const tabs=$('#settings-tabs');tabs.replaceChildren();
-  for(const [id,label]of L.tabs){const b=button(id==='group'&&config.mode==='single'?'票數與卡片':label,()=>{tab=id;renderPanels();renderBoard();},tab===id?'active':'');b.setAttribute('role','tab');b.setAttribute('aria-selected',tab===id);b.id='tab-'+id;b.setAttribute('aria-controls','settings-panel');tabs.append(b);}
+  for(const [id,label]of L.tabs){const b=button(id==='group'&&config.mode==='single'?'票數與卡片':label,()=>{board.editor.select(null);tab=id;renderPanels();renderBoard();},tab===id?'active':'');b.setAttribute('role','tab');b.setAttribute('aria-selected',tab===id);b.id='tab-'+id;b.setAttribute('aria-controls','settings-panel');tabs.append(b);}
   panel.replaceChildren();panel.setAttribute('aria-labelledby','tab-'+tab);
   ({source:sourcePanel,common:commonPanel,group:groupPanel,candidates:candidatesPanel})[tab](panel);
   if(openSections.has(panelsKey))for(const d of panel.querySelectorAll('details'))d.open=openSections.get(panelsKey).includes(d.querySelector('summary').textContent);
+  renderSourceFeedback();
   const footer=node('div','settings-footer');footer.append(button('載入我的預設',async()=>{const stored=await getStored('defaults');if(!stored){notify('尚未儲存個人預設。');return;}if(!confirm('以個人預設取代目前版面？'))return;recordHistory();config=normalizeConfig(stored);invalidate();demo=true;changed();renderPanels();},'small subtle'),button('全新看板',async()=>{if(!confirm('建立全新看板？目前草稿會被取代，請先儲存需要的設定代碼。'))return;recordHistory();config=normalizeConfig(await getStored('defaults')||defaults());selectedId=config.groups[0].candidates[0]?.id;states=[];demo=true;invalidate();changed();renderPanels();},'small subtle'));panel.append(footer);
 }
-function updateStatus(groups){
-  const errors=groups.filter(g=>g.status==='error'||g.status==='stale'||g.status==='waiting');
-  $('#connection-status').textContent=errors.length?'票源暫時延遲，保留上次資料':L.messages.connected;
+function renderSourceFeedback(){const box=$('.source-feedback');if(!box)return;box.replaceChildren();box.hidden=!connectionIssues.length;for(const issue of connectionIssues){const row=node('p','source-issue',issue.message);row.dataset.group=issue.index??'';box.append(row);}}
+function updateStatus(groups,retryIn=0){
+  connectionIssues=sourceIssues(config,groups);renderSourceFeedback();
+  $('#connection-status').textContent=connectionIssues.length?'票源讀取未完成':L.messages.connected;
   const updated=groups.filter(g=>g.updatedAt).map(g=>g.updatedAt);
-  $('#connection-detail').textContent=errors.length?errors.map(g=>g.message||'正在更新').join('；'):'最後更新 '+(updated.length?new Date(Math.max(...updated)).toLocaleTimeString('zh-TW'):'—')+' · 每 '+config.refresh+' 秒讀取';
+  $('#connection-detail').textContent=connectionIssues.length?connectionIssues.map(g=>g.message).join('\n')+(retryIn?'\n'+retryIn+' 秒後自動重試。':''):'最後更新 '+(updated.length?new Date(Math.max(...updated)).toLocaleTimeString('zh-TW'):'—')+' · 每 '+config.refresh+' 秒讀取';
 }
 function acceptVotes(groups){
   const oldTotal=states.reduce((s,g)=>s+Object.values(g.counts||{}).reduce((a,b)=>a+b,0),0);
   states=groups.map((g,i)=>g.counts?g:{...g,counts:states[i]?.counts||null});
   const total=states.reduce((s,g)=>s+Object.values(g.counts||{}).reduce((a,b)=>a+b,0),0);
   if(config.sound&&oldTotal>0&&total>oldTotal){try{const audio=new (window.AudioContext||window.webkitAudioContext)(),osc=audio.createOscillator(),gain=audio.createGain();osc.frequency.value=660;gain.gain.setValueAtTime(.07,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.25);osc.connect(gain).connect(audio.destination);osc.start();osc.stop(audio.currentTime+.25);osc.onended=()=>audio.close();}catch{}}
-  demo=false;updateStatus(groups);renderBoard();
+  demo=false;updateStatus(states);renderBoard();
 }
 const poller=new Poller(async signal=>{
   if(!session)return;const result=await coordinatedPoll(session,config.refresh,()=>cloud.request('/api/votes',{}, {token:session,signal}));if(!result)return;acceptVotes(result.groups);
-  if(result.groups.some(g=>['error','stale','waiting'].includes(g.status))){const error=new Error('票源暫時延遲，保留上次資料。');error.retryAfter=60;throw error;}
-},{seconds:config.refresh,onState:state=>{scheduleBroadcast();if(state.error){if(state.error.status===401)poller.stop();$('#connection-status').textContent='更新暫停，保留上次票數';$('#connection-detail').textContent=state.error.message+(state.nextIn?' · '+state.nextIn+' 秒後重試':'');}}});
+  if(result.groups.some(g=>['error','stale','waiting'].includes(g.status))){const error=new Error(sourceIssues(config,states).map(x=>x.message).join('\n'));error.sourceFailure=true;error.retryAfter=60;throw error;}
+},{seconds:config.refresh,onState:state=>{scheduleBroadcast();if(state.error){if(state.error.status===401)poller.stop();if(state.error.sourceFailure)updateStatus(states,state.nextIn);else{const message='連線服務：'+state.error.message;connectionIssues=[{message}];renderSourceFeedback();$('#connection-status').textContent='票數更新暫停';$('#connection-detail').textContent=message+(state.nextIn?'\n'+state.nextIn+' 秒後重試。':'');}}}});
 function modal(title){
   const dialog=$('#cloud-dialog');cleanupChallenge();cleanupChallenge=()=>{};dialog.replaceChildren();
   const top=node('div','dialog-top');top.append(node('h2','',title),button('×',()=>dialog.close(),'close-dialog'));top.lastChild.setAttribute('aria-label','關閉');dialog.append(top);dialog.showModal();return dialog;
@@ -197,18 +232,21 @@ async function cloudAction(action,title,setup,execute){
 }
 async function connect(){
   try{normalizeConfig(config);}catch(e){notify(e.message,true);return;}
+  const invalid=[];activeGroups(config).forEach((g,i)=>{try{if(g.source.url)normalizeSource(g.source);}catch(e){invalid.push({index:i,message:sourceLabel(config,i)+'：'+e.message});}});
+  if(invalid.length){connectionIssues=invalid;renderSourceFeedback();$('#connection-status').textContent='票源設定需要修正';$('#connection-detail').textContent=invalid.map(x=>x.message).join('\n');notify($('#connection-detail').textContent,true);return;}
   await cloudAction('session','連接 Google 試算表',box=>{box.append(node('p','','我們只會讀取所選票源並計算票數，不會修改你的 Google 表單或試算表。首次連接會自動加入新發現的候選選項。'));return ()=>null;},async(_,turnstile)=>{
     const result=await cloud.request('/api/session',{sources:activeGroups(config).map(g=>g.source),turnstile});
-    recordHistory();session=result.token;states=[];loadedSources=copy(activeGroups(config).map(g=>g.source));
+    recordHistory();session=result.token;states=activeGroups(config).map((g,i)=>JSON.stringify(g.source)===JSON.stringify(loadedSources[i])?states[i]||{}:{});loadedSources=copy(activeGroups(config).map(g=>g.source));
     result.groups.forEach((state,i)=>{
       if(!state.counts)return;
       const original=config.groups[i].candidates;
       const untouched=original.every(c=>!c.image&&!c.author)&&original.length===5&&original.every((c,j)=>c.answer===defaults().groups[i].candidates[j].answer);
       const keep=untouched&&config.groups[i].source.url!==DEMO_SHEET?[]:original;
-      config.groups[i].candidates=reconcileCandidates(mergeCandidates(reconcileCandidates(keep,state,config.groups[i].source),state.counts),state,config.groups[i].source);
+      try{config.groups[i].candidates=reconcileCandidates(mergeCandidates(reconcileCandidates(keep,state,config.groups[i].source),state.counts),state,config.groups[i].source);}
+      catch(e){result.groups[i]={...state,status:'error',counts:null,message:e.message};}
     });
     acceptVotes(result.groups);changed();renderPanels();poller.seconds=config.refresh;poller.start();
-    if(result.groups.some(g=>g.status==='error'))notify('部分票源尚未讀取成功，請查看預覽下方訊息。',true);else notify('票源已連接，候選作品已同步。');
+    if(connectionIssues.length)notify(connectionIssues.map(x=>x.message).join('\n'),true);else notify('票源已連接，候選作品已同步。');
   });
 }
 $('#save-code').addEventListener('click',async()=>{
@@ -237,13 +275,13 @@ $('#redo-edit').addEventListener('click',()=>restoreHistory(redoStack,undoStack)
 $('#canvas-layer').addEventListener('change',e=>board.editor.select(e.target.value));
 $('#canvas-zoom').addEventListener('change',e=>{const fit=e.target.value==='fit';$('#preview').style.width=fit?'100%':1600*Number(e.target.value)+'px';$('#preview').style.maxWidth='none';board.editor.position();});
 $('#canvas-edit-text').addEventListener('click',()=>board.editor.editText());
-$('#canvas-color').addEventListener('input',e=>{const t=board.editor.current();if(t?.colorPath){recordHistory(t.colorPath);canvasChange({[t.colorPath]:e.target.value},true);}});
+['','-end','-track'].forEach((suffix,i)=>$('#canvas-color'+suffix).addEventListener('input',e=>{const color=targetColors(board.editor.current())[i];if(color){recordHistory(color.path);canvasChange({[color.path]:e.target.value},false);}}));
 $('#canvas-size').addEventListener('input',e=>{const t=board.editor.current();if(!t?.sizePath||e.target.value==='')return;recordHistory(t.sizePath);canvasChange({[t.sizePath]:Math.max(Number(e.target.min),Math.min(Number(e.target.max),Number(e.target.value)))},false);});
 $('#canvas-size').addEventListener('blur',()=>{const t=board.editor.current();if(t?.sizePath)$('#canvas-size').value=displayNumber(t.size);});
 
 document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,[contenteditable]')||!(e.ctrlKey||e.metaKey))return;if(e.key.toLowerCase()==='z'){e.preventDefault();restoreHistory(e.shiftKey?redoStack:undoStack,e.shiftKey?undoStack:redoStack);}else if(e.key.toLowerCase()==='y'){e.preventDefault();restoreHistory(redoStack,undoStack);}});
-$('#mode-single').addEventListener('click',()=>{update('mode','single',{rebuild:true});});
-$('#mode-dual').addEventListener('click',()=>{update('mode','dual',{rebuild:true});});
+$('#mode-single').addEventListener('click',()=>{board.editor.select(null);update('mode','single',{rebuild:true});});
+$('#mode-dual').addEventListener('click',()=>{board.editor.select(null);update('mode','dual',{rebuild:true});});
 $('#refresh-now').addEventListener('click',()=>{
   if(!session){connect();return;}const elapsed=(Date.now()-lastManual)/1000;if(elapsed<15){notify('為保護免費額度，手動更新需間隔 15 秒。');return;}lastManual=Date.now();poller.start();poller.refresh();
 });

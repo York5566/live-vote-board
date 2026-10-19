@@ -14,9 +14,11 @@
       <label class="layer-picker">元素 <select id="canvas-layer"><option value="">選取畫布上的元素…</option></select></label>
       <label>檢視 <select id="canvas-zoom" aria-label="畫布檢視縮放"><option value="fit">適合畫面</option><option value="1">100%</option><option value="1.5">150%</option></select></label>
       <button id="canvas-edit-text" class="small" disabled>編輯文字</button>
-      <label id="canvas-color-label" hidden>顏色 <input id="canvas-color" type="color" aria-label="選取元素顏色"></label>
+      <label id="canvas-color-label" hidden><span id="canvas-color-text">顏色</span> <input id="canvas-color" type="color" aria-label="選取元素顏色"></label>
+      <label id="canvas-color-end-label" hidden><span id="canvas-color-end-text">結束色</span> <input id="canvas-color-end" type="color" aria-label="選取長條結束色"></label>
+      <label id="canvas-color-track-label" hidden><span id="canvas-color-track-text">底軌色</span> <input id="canvas-color-track" type="color" aria-label="選取長條底軌色"></label>
       <label id="canvas-size-label" hidden>字級 <input id="canvas-size" type="number" min="1" max="120" step="0.1" aria-label="選取元素字級"></label>
-      <div class="history-tools"><button id="undo-edit" class="small" disabled title="復原 Ctrl+Z">↶ 復原</button><button id="redo-edit" class="small" disabled title="重做 Ctrl+Shift+Z">↷ 重做</button></div>
+      <div class="history-tools"><button id="undo-edit" class="small" disabled aria-label="復原（Ctrl+Z）" aria-keyshortcuts="Control+Z">↶ 復原</button><button id="redo-edit" class="small" disabled aria-label="重做（Ctrl+Shift+Z）" aria-keyshortcuts="Control+Shift+Z">↷ 重做</button></div>
     </div>
     <div class="preview-frame"><div id="preview"></div></div>
     <div class="preview-help"><span id="canvas-selection-hint">點選移動、拉角點縮放、雙擊改字 · Ctrl+Z 復原</span><span id="save-state" class="save-state" role="status">準備中…</span></div>

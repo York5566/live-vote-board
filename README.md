@@ -4,13 +4,15 @@
 
 **線上網站：https://york5566.github.io/live-vote-board/**
 
-已於 2026-10-18 部署至 GitHub Pages，2026-10-19 更新為 1.1.0，並接上 Cloudflare Workers、D1 與 Turnstile。使用線上版不需要保持本機終端機運行。部署資源、更新方式與驗證範圍見 [正式部署紀錄](docs/PRODUCTION.md)。
+已於 2026-10-18 部署至 GitHub Pages，2026-10-20 更新為 1.1.1，並接上 Cloudflare Workers、D1 與 Turnstile。使用線上版不需要保持本機終端機運行。部署資源、更新方式與驗證範圍見 [正式部署紀錄](docs/PRODUCTION.md)。
 
 ## 功能
 
 - 單組看板不顯示組名；雙組看板上下排列。沒有左右排列與投票結算功能。
 - Google 試算表彙總票數，或直接統計表單回應欄位；A / B 票源獨立。
 - 自訂圖片、Logo、背景圖與遮罩；文字、票數、總票數、進度條、排名、卡片底色等可調。
+- 每張作品獨立設定長條起始色、結束色與底軌色；整組預設與全部套用分開操作。
+- 點選預覽會切換並捲動到對應設定；票源錯誤直接顯示組別與原因，重試期間也保留原因。
 - 畫布直接選取、拖動、拉角點縮放、旋轉圖片、雙擊改文字；元素清單、復原／重做與縮放檢視。
 - 候選自動排版，單組五個作品採上三下二置中；每張卡片可個別微調，支援小數及數字區滾輪。
 - 各分類共用固定的「儲存為我的預設」；支援選擇投影螢幕，全螢幕隱藏操作介面。
@@ -33,6 +35,7 @@
 瀏覽器測試需安裝 Playwright Chromium 或電腦上已有 Microsoft Edge：
 
     npx playwright install chromium
+    npm run test:inspector
     npm run test:editor
     npm run test:browser
     npm run test:release
@@ -41,7 +44,7 @@
 
 ## 交付壓縮檔
 
-delivery/LiveVoteBoard-1.1.0.zip 包含原始碼、部署範本、可預覽的 dist 靜態網站、驗收截圖及 SHA-256 檔案清單。解壓縮後的專案位於 LiveVoteBoard 資料夾。
+delivery/LiveVoteBoard-1.1.1.zip 包含原始碼、部署範本、可預覽的 dist 靜態網站、驗收截圖及 SHA-256 檔案清單。解壓縮後的專案位於 LiveVoteBoard 資料夾。
 
 靜態網站請透過 HTTP 伺服器開啟，不能直接雙擊 index.html。交付的 dist 不含正式 API 連線，正式部署必須依下方指南重新建置。
 

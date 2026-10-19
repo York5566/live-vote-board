@@ -17,7 +17,7 @@ export class Board {
     if(editable)this.editor=new CanvasEditor(this,{onChange,onBegin,onSelection,onMessage});
   }
   destroy(){this.observer.disconnect();this.editor?.destroy();this.node.remove();}
-  target(node,key,label,props={}){if(props.group!==undefined&&this.config.mode==='dual')label=(props.group?'B':'A')+' 組 · '+label;this.editor?.register(node,{key,label,...props});}
+  target(node,key,label,props={}){if(props.group!==undefined&&this.config.mode==='dual')label=(props.group?'B':'A')+' 組 · '+label;const settingsKey=props.section==='candidates'?key.split('-').at(-1):props.section==='group'?(key.endsWith('heading')?'heading':'total'):({'background-image':'background'}[key]||key);this.editor?.register(node,{key,label,settingsKey,...props});}
   textTarget(node,key,label,path,v,{anchor=false,unit=1,minSize=1,maxSize=120,...props}={}){
     this.target(node,key,label,{move:{x:spec(path+'.x',v.x,anchor?0:-500,anchor?100:500,anchor?'anchor':unit),y:spec(path+'.y',v.y,anchor?0:-500,anchor?100:500,anchor?'anchor':unit)},resize:{x:spec(path+'.size',v.size,minSize,maxSize)},uniform:true,colorPath:path+'.color',color:v.color,sizePath:path+'.size',size:v.size,...props});
   }
@@ -87,7 +87,7 @@ export class Board {
         const track=el('div','vote-track'),fill=el('div','vote-fill');
         Object.assign(track.style,{left:(15+style.barX)*scale+'px',width:Math.max(1,cardW-30*scale)*style.barWidth/100+'px',top:(116+style.barY)*scale+'px',height:style.barHeight*scale+'px',background:rgba(style.barTrack,style.barTrackOpacity)});
         fill.style.width=(totalVotes?c.votes/totalVotes*100:0)+'%';fill.style.background='linear-gradient(90deg,'+style.barStart+','+style.barEnd+')';track.append(fill);
-        this.target(track,key+'-bar',c.label+'｜票數長條',{move:{x:spec(dp+'.barX',style.barX,-500,500,u),y:spec(dp+'.barY',style.barY,-500,500,u)},resize:{x:spec(dp+'.barWidth',style.barWidth,10,200),y:spec(dp+'.barHeight',style.barHeight,1,40)},colorPath:dp+'.barStart',color:style.barStart,...context});
+        this.target(track,key+'-bar',c.label+'｜票數長條',{move:{x:spec(dp+'.barX',style.barX,-500,500,u),y:spec(dp+'.barY',style.barY,-500,500,u)},resize:{x:spec(dp+'.barWidth',style.barWidth,10,200),y:spec(dp+'.barHeight',style.barHeight,1,40)},colorPath:dp+'.barStart',color:style.barStart,colors:[{label:'起始色',path:dp+'.barStart',value:style.barStart},{label:'結束色',path:dp+'.barEnd',value:style.barEnd},{label:'底軌色',path:dp+'.barTrack',value:style.barTrack}],...context});
         detail.append(track);card.append(photo,detail);grid.append(card);
       });
       region.append(grid);root.append(region);

@@ -76,18 +76,20 @@ async function cachedVotes(source,env){
   const key=await sha256(JSON.stringify(source)),now=Date.now(),refresh=integer(env.MIN_REFRESH_SECONDS,15,15,300)*1000;
   const cached=await env.DB.prepare('SELECT content,fetched_at,locked_until FROM vote_cache WHERE key=?').bind(key).first();
   const old=cached?.content?JSON.parse(cached.content):null;
-  if(cached&&now-cached.fetched_at<refresh)return {...old,status:'ok',cached:true};
-  if(cached?.locked_until>now)return old?{...old,status:'stale',message:'正在更新，暫時保留上次票數。'}:{status:'waiting',counts:null,message:'正在取得票數，稍後自動重試。'};
+  if(cached&&old?.counts&&!old.message&&now-cached.fetched_at<refresh)return {...old,status:'ok',cached:true};
+  if(cached?.locked_until>now)return old?.message?{...old,cached:true}:old?{...old,status:'stale',message:'正在更新，暫時保留上次票數。'}:{status:'waiting',counts:null,message:'正在取得票數，稍後自動重試。'};
   const lock=now+10000;
   const acquired=await env.DB.prepare("INSERT INTO vote_cache(key,content,fetched_at,locked_until) VALUES(?,'',0,?) ON CONFLICT(key) DO UPDATE SET locked_until=excluded.locked_until WHERE locked_until<=? RETURNING key").bind(key,lock,now).first();
-  if(!acquired)return old?{...old,status:'stale',message:'正在更新。'}:{status:'waiting',counts:null};
+  if(!acquired)return old?.message?{...old,cached:true}:old?{...old,status:'stale',message:'正在更新。'}:{status:'waiting',counts:null};
   try{
     const result={...await fetchVotes(source),updatedAt:Date.now()};
     await env.DB.prepare('UPDATE vote_cache SET content=?,fetched_at=?,locked_until=0 WHERE key=? AND locked_until=?').bind(JSON.stringify(result),result.updatedAt,key,lock).run();
     return {...result,status:'ok',cached:false};
   }catch(e){
-    await env.DB.prepare('UPDATE vote_cache SET locked_until=? WHERE key=? AND locked_until=?').bind(Date.now()+60000,key,lock).run();
-    return {...(old||{counts:null}),status:old?'stale':'error',message:e.name==='TimeoutError'?'Google 回應逾時，保留上次資料。':e.message};
+    const failure={...(old||{counts:null}),status:old?.counts?'stale':'error',message:e.name==='TimeoutError'?'Google 回應逾時，請稍後再試。':e.message};
+    // Keep the reason during backoff without an extra query or another upstream request.
+    await env.DB.prepare('UPDATE vote_cache SET content=?,locked_until=? WHERE key=? AND locked_until=?').bind(JSON.stringify(failure),Date.now()+60000,key,lock).run();
+    return failure;
   }
 }
 async function votes(sources,env){
@@ -154,7 +156,7 @@ export default {
     try{response=await route(request,env);}
     catch(e){
       const status=e instanceof HttpError?e.status:(e.message?.includes('D1')?503:400);
-      response=json({error:e instanceof HttpError||status===400?e.message:'服務暫時忙碌，已保留上次成功資料。',retryAfter:e.retry||0},status);
+      response=json({error:e instanceof HttpError||status===400?e.message:'服務暫時忙碌，請稍後再試。',retryAfter:e.retry||0},status);
       if(e.retry)response.headers.set('Retry-After',String(e.retry));
     }
     for(const [key,value]of Object.entries(cors))response.headers.set(key,value);

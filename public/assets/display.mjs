@@ -5,6 +5,7 @@ import {CloudClient} from './api.mjs';
 import {Poller} from './polling.mjs';
 import {coordinatedPoll} from './live.mjs';
 import {createScreenPicker} from './screen-picker.mjs';
+import {sourceIssues} from '../shared/source-status.mjs';
 const params=new URLSearchParams(location.search),room=params.get('room')||'demo';
 const channel=new BroadcastChannel('live-vote-board-'+room),board=new Board(document.querySelector('#projection')),status=document.querySelector('#display-status'),cloud=new CloudClient();
 let hasState=false,lastSeen=Date.now(),current=null;
@@ -14,9 +15,9 @@ const poller=new Poller(async signal=>{
   if(!result)return;
   current.states=result.groups.map((g,i)=>g.counts?g:{...g,counts:current.states[i]?.counts||null});current.demo=false;
   channel.postMessage({type:'votes',session:current.session,groups:result.groups});render(current);
-  if(result.groups.some(g=>['error','stale','waiting'].includes(g.status))){const e=new Error('票源暫時延遲，保留上次結果。');e.retryAfter=60;throw e;}
+  if(result.groups.some(g=>['error','stale','waiting'].includes(g.status))){const e=new Error(sourceIssues(current.config,current.states).map(x=>x.message).join('\n'));e.retryAfter=60;throw e;}
 },{onState:state=>{if(state.error){status.textContent=state.error.message;if(state.error.status===401)poller.stop();}}});
-function render(state){current=state;hasState=true;lastSeen=Date.now();board.render(state.config,state.states,{demo:state.demo});document.querySelector('#display-empty').hidden=true;status.textContent=state.demo?'示範畫面':state.running?'自動更新中 · 同一瀏覽器共用更新節奏':'自動更新已暫停';poller.seconds=state.config.refresh;if(state.session&&state.running)poller.start();else poller.stop();}
+function render(state){current=state;hasState=true;lastSeen=Date.now();board.render(state.config,state.states,{demo:state.demo});document.querySelector('#display-empty').hidden=true;status.textContent=state.demo?'示範畫面':sourceIssues(state.config,state.states).map(x=>x.message).join('\n')||(state.running?'自動更新中 · 同一瀏覽器共用更新節奏':'自動更新已暫停');poller.seconds=state.config.refresh;if(state.session&&state.running)poller.start();else poller.stop();}
 channel.addEventListener('message',e=>{if(e.data?.type==='state')render(e.data);});
 channel.postMessage({type:'ready'});
 if(params.get('demo')==='1'){const config=defaults();render({config,states:demoVotes(config),demo:true});}

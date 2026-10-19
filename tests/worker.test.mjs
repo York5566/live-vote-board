@@ -56,7 +56,16 @@ test('upstream outage preserves stale counts and suppresses immediate repeat fet
   const sources=[{url:'https://docs.google.com/spreadsheets/d/OUTAGE_SHEET_12345/edit'}],session=await call('/api/session',{sources});
   await db.prepare('UPDATE vote_cache SET fetched_at=0,locked_until=0').run();upstreamFailure=true;
   const failed=await call('/api/votes',{}, {Authorization:'Bearer '+session.data.token});assert.equal(failed.data.groups[0].status,'stale');assert.equal(failed.data.groups[0].counts.甲,5);
-  const before=fetches;await call('/api/votes',{}, {Authorization:'Bearer '+session.data.token});assert.equal(fetches,before);upstreamFailure=false;
+  const before=fetches,again=await call('/api/votes',{}, {Authorization:'Bearer '+session.data.token});assert.equal(fetches,before);assert.equal(again.data.groups[0].message,failed.data.groups[0].message);assert.equal(again.data.groups[0].status,'stale');upstreamFailure=false;
+});
+test('initial source failure retains its reason across sessions and backoff, then clears on recovery',async()=>{
+  const sources=[{url:'https://docs.google.com/spreadsheets/d/INITIAL_FAILURE_12345/edit'}];upstreamFailure=true;
+  try{
+    const first=await call('/api/session',{sources});assert.equal(first.data.groups[0].status,'error');assert.equal(first.data.groups[0].counts,null);const before=fetches;
+    const second=await call('/api/session',{sources}),polled=await call('/api/votes',{}, {Authorization:'Bearer '+first.data.token});
+    for(const result of [second,polled]){assert.equal(result.data.groups[0].status,'error');assert.equal(result.data.groups[0].message,first.data.groups[0].message);assert.equal(result.data.groups[0].counts,null);}assert.equal(fetches,before);
+    upstreamFailure=false;await db.prepare('UPDATE vote_cache SET locked_until=0').run();const recovered=await call('/api/votes',{}, {Authorization:'Bearer '+first.data.token});assert.equal(recovered.data.groups[0].status,'ok');assert.equal(recovered.data.groups[0].message,undefined);assert.equal(recovered.data.groups[0].total,8);
+  }finally{upstreamFailure=false;}
 });
 test('expired snapshots cannot be loaded',async()=>{
   const saved=await call('/api/snapshots/save',{config:defaults()});await db.prepare('UPDATE snapshots SET expires_at=0 WHERE code_hash=?').bind(await sha256(saved.data.code)).run();

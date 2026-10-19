@@ -5,7 +5,7 @@ export class CanvasEditor {
   constructor(board,{onChange,onBegin=()=>{},onSelection=()=>{},onMessage=()=>{}}){
     Object.assign(this,{board,onChange,onBegin,onSelection,onMessage,targets:new Map(),selectedKey:null,gesture:null,editing:null});
     this.overlay=document.createElement('div');this.overlay.className='canvas-selection';this.overlay.hidden=true;
-    this.overlay.innerHTML='<span class="canvas-selection-label" data-handle="move" title="拖動此標籤可移動整個選取元素"></span><button data-handle="nw" aria-label="左上角縮放"></button><button data-handle="ne" aria-label="右上角縮放"></button><button data-handle="sw" aria-label="左下角縮放"></button><button data-handle="se" aria-label="右下角縮放"></button><button data-handle="rotate" aria-label="旋轉" class="rotation-handle">↻</button>';
+    this.overlay.innerHTML='<span class="canvas-selection-label" data-handle="move" aria-label="拖動此標籤可移動整個選取元素"></span><button data-handle="nw" aria-label="左上角縮放"></button><button data-handle="ne" aria-label="右上角縮放"></button><button data-handle="sw" aria-label="左下角縮放"></button><button data-handle="se" aria-label="右下角縮放"></button><button data-handle="rotate" aria-label="旋轉" class="rotation-handle">↻</button>';
     board.container.append(this.overlay);
     board.container.addEventListener('pointerdown',e=>this.start(e));
     board.container.addEventListener('dblclick',e=>{const t=this.targets.get(e.target.closest('[data-canvas]')?.dataset.canvas);if(t){e.preventDefault();this.select(t.key);this.editText();}});
@@ -17,12 +17,13 @@ export class CanvasEditor {
     this.targets.set(descriptor.key,{...descriptor,node});
   }
   beginRender(){this.targets.clear();}
-  endRender(){this.position();this.onSelection(this.current(),[...this.targets.values()]);}
+  endRender(){this.position();this.onSelection(this.current(),[...this.targets.values()],{intent:'render'});}
   current(){return this.targets.get(this.selectedKey);}
-  select(key){this.selectedKey=key;this.position();this.onSelection(this.current(),[...this.targets.values()]);}
+  select(key,{scroll=true}={}){this.selectedKey=key;this.position();this.onSelection(this.current(),[...this.targets.values()],{intent:'select',scroll});}
   position(){
     const t=this.current();this.overlay.hidden=!t;
     this.board.node.querySelectorAll('.canvas-picked').forEach(n=>n.classList.remove('canvas-picked'));
+    this.board.node.querySelectorAll('.vote-card').forEach(n=>n.classList.toggle('selected',n.dataset.candidate===t?.candidateId));
     if(!t)return;
     t.node.classList.add('canvas-picked');
     const r=t.node.getBoundingClientRect(),p=this.board.container.getBoundingClientRect();
@@ -47,7 +48,7 @@ export class CanvasEditor {
     const handle=e.target.closest('[data-handle]')?.dataset.handle;
     const key=e.target.closest('[data-canvas]')?.dataset.canvas;
     if(!handle&&!key){this.select(null);return;}
-    if(key)this.select(key);
+    if(key)this.select(key,{scroll:false});
     const t=this.current();if(!t)return;
     e.preventDefault();
     t.node.focus({preventScroll:true});
@@ -77,6 +78,7 @@ export class CanvasEditor {
       if(frame)cancelAnimationFrame(frame);
       this.gesture=null;
       if(started){this.change(last,true);this.suppressClickUntil=Date.now()+100;}
+      this.onSelection(this.current(),[...this.targets.values()],{intent:'reveal',scroll:true});
     };
     document.addEventListener('pointermove',move);document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);
   }

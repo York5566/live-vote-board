@@ -1,4 +1,4 @@
-param([string]$ArchiveName = 'LiveVoteBoard-1.1.0.zip')
+param([string]$ArchiveName = 'LiveVoteBoard-1.1.1.zip')
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if ([IO.Path]::GetFileName($ArchiveName) -ne $ArchiveName) { throw 'Pass an archive filename without a path.' }

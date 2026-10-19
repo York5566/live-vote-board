@@ -8,7 +8,7 @@ import {root,build} from './build.mjs';
 // Only this explicit source list is distributed. Never collect the entire checkout.
 const folders=['public','content','shared','worker','migrations','scripts','tests','docs','.github','dist'];
 const singles=['README.md','package.json','package-lock.json','site.config.json','wrangler.example.jsonc','.gitignore'];
-const proof=['editor-report.json','editor-single-five.png','editor-upload-fixed.png','editor-demo-connected.png','editor-canvas-controls.png','editor-mobile-v1.1.png','projection-fullscreen-clean.png','browser-report.json','release-report.json','home-desktop.png','home-mobile.png','studio-customized.png','studio-mobile.png','projection-release.png'];
+const proof=['inspector-report.json','inspector-colors.png','inspector-source-failure.png','inspector-mobile.png','editor-report.json','editor-single-five.png','editor-upload-fixed.png','editor-demo-connected.png','editor-canvas-controls.png','editor-mobile-v1.1.png','projection-fullscreen-clean.png','browser-report.json','release-report.json','home-desktop.png','home-mobile.png','studio-customized.png','studio-mobile.png','projection-release.png'];
 const {version}=JSON.parse(await readFile(join(root,'package.json'),'utf8'));
 if(!/^\d+\.\d+\.\d+$/.test(version))throw new Error('Unexpected release version');
 await build({local:false,siteUrl:'',apiBase:'',turnstileSiteKey:''});
@@ -24,7 +24,7 @@ async function add(path,name=path){
 for(const folder of folders)await add(folder);
 for(const file of singles)await add(file);
 for(const file of proof)await add('artifacts/'+file,'verification/'+file);
-for(const report of ['editor-report.json','browser-report.json','release-report.json']){
+for(const report of ['inspector-report.json','editor-report.json','browser-report.json','release-report.json']){
   const result=JSON.parse(await readFile(join(root,'artifacts',report),'utf8'));
   if(result.status!=='PASS')throw new Error('Cannot package a failing verification report: '+report);
 }

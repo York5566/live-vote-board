@@ -1,6 +1,6 @@
 {
   "name": "live-vote-board",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,7 +17,8 @@
     "worker:dev": "wrangler dev --local --port 8787",
     "worker:deploy": "node scripts/preflight.mjs && wrangler deploy",
     "package": "node scripts/package.mjs",
-    "test:editor": "node tests/editor-browser.mjs"
+    "test:editor": "node tests/editor-browser.mjs",
+    "test:inspector": "node tests/inspector-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
