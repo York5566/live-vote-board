@@ -1,5 +1,19 @@
 # 正式部署紀錄
 
+## 1.1.1 已上線（2026-10-20）
+
+- 功能原始碼 commit：9cfc52e02a604e4fdc7ee1eefdb75f303ccfc80d。
+- [GitHub Pages 成功發布流程](https://github.com/York5566/live-vote-board/actions/runs/39303868481)。
+- Worker version：5df027c5-f4af-4c13-bd75-4fa4d89fe968。
+- 移除原生 title 提示，保留自訂提示與網頁標題；每張作品的長條起始色、結束色、底軌色可個別設定；點選畫布會展開並捲到對應設定。
+- 錯誤訊息顯示組別與原因。後端在重試等待期保存原始失敗原因，成功後清除；保留原資料庫、資料表、憑證與流量保護，沒有 migration。
+
+正式 HTTPS 網站通過 9 項檢查：正確 commit 發布成功、修改的前端模組與本機相符、SEO 與正式設定保留、Worker 健康／CORS／簽章要求正常、自訂提示沒有原生提示重複、三色獨立調整、預覽導航與 B 組網址驗證、手機設定跳轉且無橫向溢位、無瀏覽器執行例外。以隔離的 Edge 瀏覽器資料驗證，沒有更動使用者現有草稿。
+
+本機 55 個資料／後端測試、40 個瀏覽器流程、155 個數值欄位檢查與 6 個發布檢查通過。正式站未執行真人 Turnstile 成功挑戰及雲端寫入；設定代碼保存／還原和票源解析失敗由本機 Worker / D1 驗證。未進行 Google 表單送票、實體投影機或活動負載測試。
+
+證據：artifacts/production-v1.1.1-report.json、production-v1.1.1-editor.png、production-v1.1.1-mobile.png。詳細本機範圍見 [VALIDATION.md](VALIDATION.md)。
+
 ## 1.1.0 已上線（2026-10-19）
 
 前端與 Cloudflare 後端已完成更新，使用原來的網站網址。
